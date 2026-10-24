@@ -22,6 +22,7 @@ let csrfToken = ''
 let onLicenseBlocked: ((license: LicenseStatus) => void) | undefined
 let onUnauthorized: (() => void) | undefined
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/+$/, '')
+const crossOriginApi = /^https?:\/\//i.test(apiBaseUrl)
 
 function apiUrl(path: string) {
   const endpoint = path.startsWith('/api') ? path.slice(4) : path
@@ -47,7 +48,7 @@ export async function request<T>(
   options: { body?: unknown; idempotencyKey?: string; signal?: AbortSignal } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {}
-  const init: RequestInit = { credentials: 'same-origin', headers, signal: options.signal }
+  const init: RequestInit = { credentials: crossOriginApi ? 'include' : 'same-origin', headers, signal: options.signal }
   if (options.body !== undefined) {
     init.method = 'POST'
     headers['Content-Type'] = 'application/json'

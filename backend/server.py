@@ -56,8 +56,41 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
         if cookie:
             self.send_header('Set-Cookie', cookie)
+        self.cors_headers()
         self.end_headers()
         self.wfile.write(payload)
+
+    def request_origin(self):
+        origin = self.headers.get('Origin')
+        if not origin:
+            return None
+        parsed = urlsplit(origin)
+        if parsed.scheme not in ('http', 'https') or not parsed.netloc or parsed.path not in ('', '/') or parsed.username or parsed.password:
+            return None
+        return '%s://%s' % (parsed.scheme, parsed.netloc)
+
+    def cors_headers(self):
+        origin = self.request_origin()
+        if not origin or origin not in allowed_origins():
+            return
+        self.send_header('Access-Control-Allow-Origin', origin)
+        self.send_header('Access-Control-Allow-Credentials', 'true')
+        self.send_header('Vary', 'Origin')
+
+    def do_OPTIONS(self):
+        origin = self.request_origin()
+        if not origin or origin not in allowed_origins():
+            self.send_response(403)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
+        self.send_response(204)
+        self.cors_headers()
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token, Idempotency-Key')
+        self.send_header('Access-Control-Max-Age', '600')
+        self.send_header('Content-Length', '0')
+        self.end_headers()
 
     def body(self):
         try:
@@ -87,10 +120,11 @@ class Handler(BaseHTTPRequestHandler):
         return session, user
 
     def same_origin(self):
-        origin = self.headers.get('Origin')
-        if origin:
-            parsed = urlsplit(origin)
-            require(parsed.scheme in ('http', 'https') and parsed.netloc == self.headers.get('Host'), 'Cross-origin request rejected.', 403)
+        origin = self.request_origin()
+        if origin and origin in allowed_origins():
+            return
+        if self.headers.get('Origin'):
+            require(origin is not None and origin.split('://', 1)[-1] == self.headers.get('Host'), 'Cross-origin request rejected.', 403)
         require(self.headers.get('Sec-Fetch-Site') != 'cross-site', 'Cross-site request rejected.', 403)
 
     def require_license(self):
@@ -167,7 +201,7 @@ class Handler(BaseHTTPRequestHandler):
                     require(secrets.compare_digest(self.headers.get('X-CSRF-Token',''), session['csrf']), 'Invalid session token. Refresh and try again.', 403)
                     if path == '/api/logout':
                         data['sessions'].remove(session)
-                        cookie = 'supplylink_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'
+                        cookie = session_cookie(clear=True)
                         result = dict(ok=True)
                     else:
                         self.require_license()
@@ -190,11 +224,27 @@ class Handler(BaseHTTPRequestHandler):
         session = dict(token_hash=hashlib.sha256(token.encode()).hexdigest(), csrf=secrets.token_urlsafe(24), user_id=user['id'], expires=time.time()+43200)
         data['sessions'] = [s for s in data['sessions'] if s['expires'] > time.time()]
         data['sessions'].append(session)
-        secure = '; Secure' if os.environ.get('COOKIE_SECURE') == '1' else ''
-        cookie = 'supplylink_session=%s; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200%s' % (token, secure)
+        cookie = session_cookie(token)
         result = self.auth_response(user, session)
         result['_cookie'] = cookie
         return result
+
+
+def allowed_origins():
+    return {item.strip().rstrip('/') for item in os.environ.get('CORS_ORIGINS', '').split(',') if item.strip()}
+
+
+def session_cookie(token='', clear=False):
+    max_age = '0' if clear else '43200'
+    if allowed_origins():
+        # A browser will only store a cookie for the API host when the page is on another host
+        # if the cookie is Secure, SameSite=None, and partitioned to that page.
+        extra = '; Secure; SameSite=None; Partitioned'
+    else:
+        extra = '; SameSite=Strict'
+        if os.environ.get('COOKIE_SECURE') == '1':
+            extra += '; Secure'
+    return 'supplylink_session=%s; HttpOnly%s; Path=/; Max-Age=%s' % (token, extra, max_age)
 
 
 def main():

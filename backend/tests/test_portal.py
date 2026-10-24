@@ -2,6 +2,7 @@ import concurrent.futures
 import copy
 import http.cookiejar
 import json
+import os
 import sys
 import tempfile
 import threading
@@ -138,6 +139,32 @@ class PortalTests(unittest.TestCase):
         self.assertEqual(self.admin.request('/api/users',dict(id='retailer',active=False))[0],200)
         self.assertEqual(self.retailer.request('/api/state')[0],401)
         self.assertEqual(self.admin.request('/api/users',dict(id='admin',active=False))[0],400)
+    def test_configured_frontend_origin_receives_credentialed_cors(self):
+        os.environ['CORS_ORIGINS'] = 'https://portal.example'
+        try:
+            preflight = urllib.request.Request(self.base + '/api/login', method='OPTIONS', headers={
+                'Origin': 'https://portal.example',
+                'Access-Control-Request-Method': 'POST',
+                'Access-Control-Request-Headers': 'content-type,x-csrf-token',
+            })
+            with urllib.request.urlopen(preflight) as response:
+                self.assertEqual(response.status, 204)
+                self.assertEqual(response.headers['Access-Control-Allow-Origin'], 'https://portal.example')
+                self.assertEqual(response.headers['Access-Control-Allow-Credentials'], 'true')
+            login = urllib.request.Request(
+                self.base + '/api/login',
+                data=json.dumps(dict(email='admin@supplylink.local', password='Demo@123')).encode(),
+                headers={'Content-Type': 'application/json', 'Origin': 'https://portal.example', 'Sec-Fetch-Site': 'cross-site'},
+            )
+            with urllib.request.urlopen(login) as response:
+                cookie = response.headers['Set-Cookie']
+                self.assertIn('SameSite=None', cookie)
+                self.assertIn('Secure', cookie)
+                self.assertIn('Partitioned', cookie)
+                self.assertEqual(response.headers['Access-Control-Allow-Origin'], 'https://portal.example')
+            self.assertEqual(self.admin.request('/api/pricing', dict(bulk_min=10, bulk_discount_bps=0), origin='https://evil.example')[0], 403)
+        finally:
+            os.environ.pop('CORS_ORIGINS', None)
     def test_duplicate_requests_and_concurrent_stock_reservation(self):
         code,first=self.place(quantity=1)
         self.assertEqual(code,200)
