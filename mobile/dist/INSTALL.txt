@@ -1,0 +1,24 @@
+SupplyLink Android 1.0.0 — evaluation builds
+
+Android 8.0+ is required. These two APKs are signed with a development certificate.
+Install the Retailer APK for pharmacy users and Delivery APK for delivery users.
+Administrator and distributor users use the existing web portal.
+
+These clients require the existing SupplyLink backend; they contain no database,
+commercial licence or licence issuer key. The installation's software expiry
+remains UNCONFIGURED, so only login/logout are enabled until distribution.
+
+Emulator server URL: http://10.0.2.2:8000
+USB-connected phone: adb reverse tcp:8000 tcp:8000
+Then use server URL http://127.0.0.1:8000 on the phone.
+Remote deployments: use a trusted HTTPS origin, without a path or /api suffix.
+Only emulator/localhost HTTP is permitted by these debug builds.
+
+Demo accounts: retailer@supplylink.local / delivery@supplylink.local
+Demo password: Demo@123
+New accounts require administrator approval. Replace demo credentials for real use.
+
+Release builds enforce HTTPS and must be signed with your own Android app key.
+Read the project's README.md Native Android apps section for build and QA steps.
+The source ZIP contains Android clients only; the Python backend remains in the
+parent SupplyLink project.

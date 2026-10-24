@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+.venv/
+data/
+.env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+.DS_Store
+.secrets/
+backend/config/license-public.pem
+*signing-private.pem
+
+# Android build outputs and local machine configuration
+mobile/.gradle/
+mobile/local.properties
+mobile/**/build/
+mobile/*.jks
+mobile/*.keystore
+mobile/*-check.log
+mobile/backend-tests.log

@@ -1,0 +1,232 @@
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Banknote, MapPin, Navigation, Package, PackageCheck, PencilLine, RefreshCw } from 'lucide-react-native';
+import { useState } from 'react';
+import { Alert, Text, View } from 'react-native';
+import { StageBadge, Timeline, Totals } from '@/components/orders';
+import { Body, Button, Card, colors, Dialog, EmptyState, Field, Muted, Screen, Title } from '@/components/ui';
+import { currentFix } from '@/lib/location';
+import { coordinate, dateTime, money, percent, stageLabel } from '@/lib/rules';
+import { stateName } from '@/lib/states';
+import type { Order } from '@/lib/types';
+import { useSession } from '@/session/SessionProvider';
+import { useToast } from '@/session/ToastProvider';
+
+export default function OrderScreen() {
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { workspace, refresh } = useSession();
+  const order = workspace?.orders.find((o) => o.id === id);
+
+  if (!order) {
+    return (
+      <Screen title="Delivery" onBack={router.back} bottomInset>
+        <EmptyState message="This delivery is no longer assigned to you." />
+      </Screen>
+    );
+  }
+
+  const latest = order.tracking.at(-1);
+
+  return (
+    <Screen title={order.number} subtitle={stageLabel(order.status)} onBack={router.back} onRefresh={refresh} bottomInset>
+      <Card>
+        <Title>{order.retailer_name}</Title>
+        <StageBadge status={order.status} />
+        <Body>{order.address}</Body>
+        <Muted className="text-sm">
+          Payment: {order.payment_method === 'cod' ? 'Cash on delivery' : 'Trade credit'} · {order.payment_status}
+        </Muted>
+        <Muted>
+          Place of supply: {stateName(order.supply_state_code)}
+          {order.tax_type ? ` · ${order.tax_type}` : ''}
+        </Muted>
+      </Card>
+
+      <DeliveryActions order={order} />
+
+      {order.lines.map((line) => (
+        <Card key={line.product_id}>
+          <Text className="text-[17px] font-bold text-ink">{line.name}</Text>
+          <Muted className="text-sm">
+            {line.quantity} × {money(line.unit_price)} · {line.unit}
+          </Muted>
+          {line.gst_rate_bps !== undefined ? (
+            <Muted>
+              HSN {line.hsn_code} · GST {percent(line.gst_rate_bps)} · Tax {money(line.tax)}
+            </Muted>
+          ) : null}
+          {line.batches?.length ? (
+            line.batches.map((batch) => (
+              <View key={batch.batch_number} className="mt-2 flex-row rounded-xl bg-canvas px-3 py-2">
+                <Package size={15} color={colors.brand} style={{ marginTop: 2 }} />
+                <Text className="ml-2 flex-1 text-[13px] text-ink">
+                  {batch.batch_number} · Exp {batch.expiry_date} · Qty {batch.quantity}
+                  {'\n'}MRP {money(batch.mrp)} incl. GST
+                </Text>
+              </View>
+            ))
+          ) : (
+            <Muted className="text-xs">Batch details are unavailable for this legacy order.</Muted>
+          )}
+        </Card>
+      ))}
+
+      <Card>
+        <Totals totals={order} />
+      </Card>
+
+      <Card>
+        <Title>Order timeline</Title>
+        <Timeline history={order.history} />
+      </Card>
+
+      {latest ? (
+        <Card>
+          <View className="flex-row items-center">
+            <MapPin size={16} color={colors.brand} />
+            <Text className="ml-2 text-base font-bold text-ink">Latest shared location</Text>
+          </View>
+          <Body className="text-sm">
+            {latest.latitude}, {latest.longitude}
+          </Body>
+          <Muted className="text-xs">{dateTime(latest.at)}</Muted>
+        </Card>
+      ) : null}
+
+      <Button title="Refresh order" icon={RefreshCw} variant="secondary" onPress={refresh} />
+    </Screen>
+  );
+}
+
+function DeliveryActions({ order }: { order: Order }) {
+  const toast = useToast();
+  const { request, refresh, keyFor, dropKey, showError, busy } = useSession();
+  const [manualOpen, setManualOpen] = useState(false);
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [collectionOpen, setCollectionOpen] = useState(false);
+  const [reference, setReference] = useState('');
+  const [locating, setLocating] = useState(false);
+
+  const confirmLocation = (lat: number, lon: number, source: string) =>
+    Alert.alert(
+      'Share this location?',
+      `${source}\n${lat}, ${lon}\nThis point will be visible to the retailer and distributor for this order.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Share',
+          onPress: async () => {
+            if (!(await request('POST', '/api/tracking', { order_id: order.id, latitude: lat, longitude: lon }))) return;
+            toast('Location shared.');
+            await refresh();
+          },
+        },
+      ],
+    );
+
+  const shareCurrent = async () => {
+    setLocating(true);
+    const fix = await currentFix(() => toast('Finding your location…'));
+    setLocating(false);
+    if (typeof fix === 'string') toast(fix);
+    else confirmLocation(fix.latitude, fix.longitude, fix.source);
+  };
+
+  const reviewManual = () => {
+    try {
+      const lat = coordinate(latitude, 90);
+      const lon = coordinate(longitude, 180);
+      setManualOpen(false);
+      confirmLocation(lat, lon, 'Manually entered coordinates');
+    } catch (error) {
+      showError((error as Error).message);
+    }
+  };
+
+  const markDelivered = () =>
+    Alert.alert('Confirm delivery', 'Has the customer received this order?', [
+      { text: 'Back', style: 'cancel' },
+      {
+        text: 'Delivered',
+        onPress: async () => {
+          if (await request('POST', `/api/orders/${order.id}`, { status: 'delivered' })) await refresh();
+        },
+      },
+    ]);
+
+  const recordCollection = async () => {
+    const ref = reference.trim();
+    if (!ref) {
+      showError('A receipt or payment reference is required.');
+      return;
+    }
+    const scope = `collection:${order.id}`;
+    setCollectionOpen(false);
+    const payment = await request(
+      'POST',
+      '/api/payments',
+      { order_id: order.id, amount: order.total, reference: ref },
+      { idempotencyKey: keyFor(scope) },
+    );
+    if (!payment) return;
+    dropKey(scope);
+    setReference('');
+    toast('Collection recorded.');
+    await refresh();
+  };
+
+  const outForDelivery = order.status === 'out_for_delivery';
+  const awaitingCollection = order.status === 'delivered' && order.payment_status !== 'paid';
+  if (!outForDelivery && !awaitingCollection) return null;
+
+  return (
+    <>
+      {outForDelivery ? (
+        <Card>
+          <Title className="text-base">On the road</Title>
+          <Muted>Location is shared once, only after you confirm it. Nothing is tracked in the background.</Muted>
+          <Button
+            title={locating ? 'Finding location…' : 'Share current location'}
+            icon={Navigation}
+            disabled={locating || busy}
+            onPress={shareCurrent}
+          />
+          <Button title="Enter location manually" icon={PencilLine} variant="secondary" onPress={() => setManualOpen(true)} />
+          <Button title="Mark as delivered" icon={PackageCheck} disabled={busy} onPress={markDelivered} />
+        </Card>
+      ) : null}
+
+      {awaitingCollection ? (
+        <Button
+          title={`Record collection · ${money(order.total)}`}
+          icon={Banknote}
+          disabled={busy}
+          onPress={() => setCollectionOpen(true)}
+        />
+      ) : null}
+
+      <Dialog
+        visible={manualOpen}
+        title="Share delivery location"
+        confirmLabel="Review"
+        onCancel={() => setManualOpen(false)}
+        onConfirm={reviewManual}
+      >
+        <Field label="Latitude" value={latitude} onChangeText={setLatitude} keyboardType="numbers-and-punctuation" />
+        <Field label="Longitude" value={longitude} onChangeText={setLongitude} keyboardType="numbers-and-punctuation" />
+      </Dialog>
+
+      <Dialog
+        visible={collectionOpen}
+        title={`Collection · ${money(order.total)}`}
+        message="Record the full amount already collected. This does not charge a bank account."
+        confirmLabel="Record"
+        onCancel={() => setCollectionOpen(false)}
+        onConfirm={recordCollection}
+      >
+        <Field label="Receipt / payment reference" value={reference} onChangeText={setReference} autoCapitalize="characters" />
+      </Dialog>
+    </>
+  );
+}
