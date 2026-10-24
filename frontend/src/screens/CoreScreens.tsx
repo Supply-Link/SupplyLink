@@ -218,7 +218,7 @@ export function Catalog() {
     toast(`${product.name} added to order.`)
   }
   return <>
-    <PageHeader title="Medicine catalog" subtitle="Generic medicines. Clear stock visibility. Connected distribution." eyebrow={state.user.business} actions={<Button onClick={() => setShowCart(true)}><ShoppingCart /> View order{count ? ` · ${count}` : ''}</Button>} />
+    <PageHeader title="Medicine catalog" subtitle="Generic medicines. Clear stock visibility. Connected distribution." eyebrow={state.user.business} actions={<Button onClick={() => setShowCart(true)}><ShoppingCart /> View cart{count ? ` · ${count}` : ''}</Button>} />
     <Notice>India medicine catalog · Seeded prices, pack sizes, and stock are demo trade data.</Notice>
     <div className="toolbar"><div className="actions"><b>{state.products.filter((product) => product.active).length} medicines</b><select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((value) => <option key={value} value={value}>{value === 'all' ? 'All categories' : value}</option>)}</select></div><SearchInput value={query} onChange={setQuery} placeholder="Search medicine, strength or SKU" /></div>
     {products.length ? <div className="catalog-grid">{products.map((product) => <ProductCard key={product.id} product={product} quantity={cart[product.id] || 0} onAdd={() => add(product)} onDetails={() => setDetails(product)} />)}</div> : <Card><Empty title="No matching medicines">Try a different name, strength, or category.</Empty></Card>}
