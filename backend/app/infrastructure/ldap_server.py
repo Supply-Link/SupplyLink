@@ -7,8 +7,8 @@ import re
 import socketserver
 import threading
 import time
-from .directory import BASE_DN, authenticate, enabled, entries, user_dn
-from .licensing import LicenseStore
+from app.auth.directory import BASE_DN, authenticate, enabled, entries, user_dn
+from app.infrastructure.licensing import LicenseStore
 
 
 def tlv(tag, payload):

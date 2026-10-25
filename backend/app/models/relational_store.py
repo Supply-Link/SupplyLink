@@ -11,7 +11,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
-from app.pharmacy import migrate
+from app.domain.pharmacy import migrate
 
 
 SCHEMA = Path(__file__).resolve().parents[2] / 'db' / 'schema.sql'

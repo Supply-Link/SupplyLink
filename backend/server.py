@@ -8,8 +8,8 @@ from pathlib import Path
 
 import uvicorn
 from app.main import create_app
-from app.ldap_server import LDAPServer
-from app.licensing import DEFAULT_LICENSE, DEFAULT_PUBLIC_KEY, LicenseStore
+from app.infrastructure.ldap_server import LDAPServer
+from app.infrastructure.licensing import DEFAULT_LICENSE, DEFAULT_PUBLIC_KEY, LicenseStore
 from app.services.portal import PortalService
 from app.models.store import Store
 

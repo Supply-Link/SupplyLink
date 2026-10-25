@@ -20,12 +20,18 @@ supplylink/
 │   ├── src/lib/              Checkout, licence, constants, and helper logic
 │   └── package.json          Frontend scripts and dependencies
 ├── backend/                  Python API and persistence service
-│   ├── app/controllers/      FastAPI HTTP controllers
-│   ├── app/services/         Application use cases and transaction boundary
-│   ├── app/ports.py          Replaceable business operations interface
-│   ├── app/                  Domain, authentication, LDAP, licensing, and stores
+│   ├── app/                  FastAPI application package
+│   │   ├── auth/             Directory authentication
+│   │   ├── controllers/      HTTP request handling and delegation
+│   │   ├── domain/           Pharmacy and batch rules
+│   │   ├── infrastructure/   LDAP and offline licence support
+│   │   ├── models/           Business rules, page projections, and stores
+│   │   ├── routes/           Authentication, page, and command routes
+│   │   ├── services/         Portal orchestration and business-operation ports
+│   │   └── main.py           FastAPI composition root
 │   ├── contracts/            Versioned future gRPC contracts
 │   ├── db/schema.sql         Normalized PostgreSQL schema and access controls
+│   ├── db/seed.json          Initial sample dataset
 │   ├── tests/                Backend workflow, security, and licensing tests
 │   ├── server.py             FastAPI/Uvicorn and local LDAP entry point
 │   ├── legacy_server.py      Previous HTTP adapter retained for regression tests
@@ -192,9 +198,9 @@ The older native Android applications are retained as reference and evaluation a
 
 ## Backend application architecture and future service extraction
 
-The default backend process runs FastAPI on Uvicorn. Its controllers retain the existing `/api` paths and response shapes used by web and mobile clients. Controllers parse and validate HTTP requests, enforce origin and CSRF handling, and map domain errors to JSON responses. `PortalService` owns authentication, licence checks, rate limits, and transaction boundaries. Domain modules retain order, inventory, payment, and return rules. The PostgreSQL store remains the persistence adapter. The optional LDAP listener shares the service's store and licence checker.
+The default backend process runs FastAPI on Uvicorn. Its controllers retain the existing `/api` paths and response shapes used by web and mobile clients. Controllers parse and validate HTTP requests, enforce origin and CSRF handling, and map domain errors to JSON responses. `PortalService` owns authentication, licence checks, rate limits, and transaction boundaries. Business rules and persistence adapters live in `app/models/`; pharmacy and batch rules are in `app/domain/pharmacy.py`. Directory authentication, LDAP/licensing infrastructure, and business-operation ports are grouped under `app/auth/`, `app/infrastructure/`, and `app/services/`, respectively. The optional LDAP listener shares the service's store and licence checker. `app/main.py` composes the FastAPI application, and `server.py` is the process entry point.
 
-`BusinessOperations` is an application port with an in-process implementation. It allows a major domain component to be replaced by a service adapter later without teaching HTTP controllers about its transport. `backend/contracts/supplylink/v1/operations.proto` is a versioned draft for an internal gRPC service; no gRPC server or cross-service network call is deployed in this phase. Before extraction, define component-specific typed protobuf messages, service ownership of data and transactions, deadlines, mutual authentication, idempotency propagation, observability, and a reliable outbox or compensating workflow for operations that cross service boundaries. The public web/mobile contract remains HTTP unless a separate client migration is planned.
+`BusinessOperations` is an application port in `app/services/ports.py` with an in-process implementation. It allows a major domain component to be replaced by a service adapter later without teaching HTTP controllers about its transport. `backend/contracts/supplylink/v1/operations.proto` is a versioned draft for an internal gRPC service; no gRPC server or cross-service network call is deployed in this phase. Before extraction, define component-specific typed protobuf messages, service ownership of data and transactions, deadlines, mutual authentication, idempotency propagation, observability, and a reliable outbox or compensating workflow for operations that cross service boundaries. The public web/mobile contract remains HTTP unless a separate client migration is planned.
 
 ## Mobile app design and screens delivered in this phase
 
@@ -215,7 +221,7 @@ The help screens answer common usage questions and navigate to relevant app area
 - The React frontend has its own environment configuration for the `/api` base path and local backend proxy target. Frontend environment variables contain no database credentials.
 - Portal records use normalized PostgreSQL tables for accounts, products, batches, orders, order lines, reserved batch allocations, status history, tracking, payments, notifications, sessions, audit events, and pricing.
 - Database constraints protect relationships, unique email/SKU/idempotency values, valid monetary values, dates, roles, statuses, and coordinate ranges. Immutable order snapshots remain separate from current product and business-profile records.
-- An empty database is initialized with the required tables and demo data. Existing JSON or legacy JSONB records can be backed up and migrated into the normalized structure without changing the frontend or API.
+- `backend/db/seed.json` is the version-controlled initial sample dataset used when the local JSON adapter or a new database needs initial records. Pharmacy migration logic adds date-relative demo batch facts when seeding. Existing PostgreSQL records are not overwritten by this fixture; normal changes made through the app are persisted by the PostgreSQL adapter. Existing JSON or legacy JSONB records can be backed up and migrated into the normalized structure without changing the frontend or API.
 - The planned production database is PostgreSQL installed on the EC2 instance. Moving from Supabase must use a controlled PostgreSQL backup and restore, followed by record-count and workflow verification. After migration, only the backend database URL and SSL setting should need to change; no frontend database setting exists.
 - The EC2 deployment must include encrypted connections where applicable, restricted database network access, automated backups, restore testing, monitoring, security updates, and enough disk capacity for retained data and backups.
 

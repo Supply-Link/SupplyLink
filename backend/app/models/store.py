@@ -1,4 +1,4 @@
-"""Persistence selection, seed data, and the isolated JSON-file test adapter."""
+"""Persistence selection and the isolated JSON-file test adapter."""
 import copy
 try:
     import fcntl
@@ -14,8 +14,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 import hashlib
 import secrets
-from app.catalog import medicine_products
-from app.pharmacy import migrate
+from app.domain.pharmacy import migrate
+
+SEED_FIXTURE = Path(__file__).resolve().parents[2] / 'db' / 'seed.json'
 
 
 def now():
@@ -33,18 +34,9 @@ def verify_password(password, stored):
 
 
 def seed():
-    users = [
-        dict(id='admin', name='Aditi Sharma', business='SupplyLink Operations', role='admin', email='admin@supplylink.local'),
-        dict(id='distributor', name='Vikram Mehta', business='Metro Pharma Distributors', role='distributor', email='distributor@supplylink.local'),
-        dict(id='retailer', name='Priya Patel', business='Patel Pharmacy', role='retailer', email='retailer@supplylink.local', credit_limit=10000000, credit_used=0, address='24 Market Road, Bengaluru'),
-        dict(id='retailer2', name='Arjun Rao', business='Rao Medicals', role='retailer', email='retailer2@supplylink.local', credit_limit=5000000, credit_used=0, address='18 Lake View, Bengaluru'),
-        dict(id='delivery', name='Rahul Kumar', business='Delivery Partner', role='delivery', email='delivery@supplylink.local'),
-    ]
-    for u in users:
-        u['password'] = password_hash('Demo@123')
-        u['active'] = True
-    products = medicine_products()
-    data = dict(version=3, users=users, products=products, orders=[], payments=[], notifications=[], sessions=[], audit=[], pricing={'bulk_min': 10, 'bulk_discount_bps': 500}, created_at=now())
+    with SEED_FIXTURE.open(encoding='utf-8') as file:
+        data = json.load(file)
+    data['created_at'] = now()
     migrate(data)
     return data
 

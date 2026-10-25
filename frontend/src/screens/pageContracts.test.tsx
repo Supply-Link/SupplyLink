@@ -48,7 +48,7 @@ const pages: Array<[Exclude<PageName, 'shell'>, ComponentType, Role[]]> = [
   ['catalog', Catalog, ['retailer']],
   ['orders', Orders, ['admin', 'distributor', 'retailer']],
   ['deliveries', Deliveries, ['admin', 'distributor', 'delivery']],
-  ['payments', Payments, ['admin', 'distributor', 'retailer', 'delivery']],
+  ['payments', Payments, ['distributor']],
   ['credit', Credit, ['admin', 'retailer']],
   ['inventory', Inventory, ['admin', 'distributor']],
   ['people', People, ['admin']], ['pricing', Pricing, ['admin']],

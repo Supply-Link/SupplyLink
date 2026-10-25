@@ -8,8 +8,8 @@ import uvicorn
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'backend'))
 from app.controllers.http import create_app
 from app.services.portal import PortalService
-from app.store import Store
-from app.licensing import LicenseStore, create_issuer, issue_license
+from app.models.store import Store
+from app.infrastructure.licensing import LicenseStore, create_issuer, issue_license
 
 with tempfile.TemporaryDirectory(prefix='supplylink-android-qa-') as temporary:
     root = Path(temporary)

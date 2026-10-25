@@ -1,8 +1,8 @@
 """Role-scoped page projections; only prepare the collections the page consumes."""
 import copy
 from app.models.domain import safe_user, visible_orders
-from app.directory import user_dn
-from app.pharmacy import stock_summary, batch_status
+from app.auth.directory import user_dn
+from app.domain.pharmacy import stock_summary, batch_status
 from app.models.pages import PAGE_FIELDS
 
 

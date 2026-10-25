@@ -17,7 +17,7 @@ const nav = [
   { to: '/catalog', label: 'Medicine catalog', icon: ShoppingBasket, roles: ['retailer'] },
   { to: '/orders', label: 'Orders', icon: ClipboardList, roles: ['admin', 'distributor', 'retailer'] },
   { to: '/deliveries', label: 'Deliveries', icon: Truck, roles: ['admin', 'distributor', 'delivery'] },
-  { to: '/payments', label: 'Payments', icon: WalletCards, roles: ['admin', 'distributor', 'retailer', 'delivery'] },
+  { to: '/payments', label: 'Payments', icon: WalletCards, roles: ['distributor'] },
   { to: '/credit', label: 'Trade credit', icon: CreditCard, roles: ['admin', 'retailer'] },
   { to: '/inventory', label: 'Medicines & inventory', icon: Boxes, roles: ['admin', 'distributor'] },
   { to: '/people', label: 'People & roles', icon: Users, roles: ['admin'] },

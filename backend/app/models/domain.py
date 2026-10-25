@@ -3,9 +3,9 @@ import secrets
 import re
 import copy
 from datetime import date
-from app.pharmacy import today, batch_status, stock_summary, sync_stock, STATE_CODES
+from app.domain.pharmacy import today, batch_status, stock_summary, sync_stock, STATE_CODES
 from .store import now, password_hash
-from app.directory import user_dn
+from app.auth.directory import user_dn
 
 
 class Problem(Exception):

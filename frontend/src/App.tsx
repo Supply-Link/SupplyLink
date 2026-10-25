@@ -58,7 +58,7 @@ export default function App() {
               <Route path="catalog" element={<Protected roles={['retailer']}><PageDataBoundary page="catalog"><Catalog /></PageDataBoundary></Protected>} />
               <Route path="orders" element={<Protected roles={['admin', 'distributor', 'retailer']}><PageDataBoundary page="orders"><Orders /></PageDataBoundary></Protected>} />
               <Route path="deliveries" element={<Protected roles={['admin', 'distributor', 'delivery']}><PageDataBoundary page="deliveries"><Deliveries /></PageDataBoundary></Protected>} />
-              <Route path="payments" element={<PageDataBoundary page="payments"><Payments /></PageDataBoundary>} />
+              <Route path="payments" element={<Protected roles={['distributor']}><PageDataBoundary page="payments"><Payments /></PageDataBoundary></Protected>} />
               <Route path="credit" element={<Protected roles={['admin', 'retailer']}><PageDataBoundary page="credit"><Credit /></PageDataBoundary></Protected>} />
               <Route path="inventory" element={<Protected roles={['admin', 'distributor']}><PageDataBoundary page="inventory"><Inventory /></PageDataBoundary></Protected>} />
               <Route path="people" element={<Protected roles={['admin']}><PageDataBoundary page="people"><People /></PageDataBoundary></Protected>} />

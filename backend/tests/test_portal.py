@@ -12,8 +12,8 @@ import urllib.request
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from legacy_server import PortalServer
-from app.store import Store
-from app.licensing import LicenseStore, create_issuer, issue_license
+from app.models.store import Store
+from app.infrastructure.licensing import LicenseStore, create_issuer, issue_license
 
 class Client:
     def __init__(self, base):
@@ -274,7 +274,7 @@ class PortalTests(unittest.TestCase):
 
     def test_batch_fefo_split_and_exact_cancellation(self):
         from datetime import timedelta
-        from app.pharmacy import today
+        from app.domain.pharmacy import today
         batch=dict(product_id='med01',batch_number='EARLY-LOT',manufacturing_date=(today()-timedelta(days=50)).isoformat(),expiry_date=(today()+timedelta(days=10)).isoformat(),stock=5,mrp=3300,purchase_price=1700)
         code,received=self.distributor.request('/api/batches',batch)
         self.assertEqual(code,200)
@@ -290,7 +290,7 @@ class PortalTests(unittest.TestCase):
 
     def test_expired_quarantine_and_dispatch_blocking(self):
         from datetime import timedelta
-        from app.pharmacy import today
+        from app.domain.pharmacy import today
         with self.store.transaction() as data:
             data['products'][0]['batches'][0]['expiry_date']=(today()-timedelta(days=1)).isoformat()
         product=self.retailer.state()['products'][0]
@@ -312,7 +312,7 @@ class PortalTests(unittest.TestCase):
 
     def test_batch_dates_mrp_and_permissions(self):
         from datetime import timedelta
-        from app.pharmacy import today
+        from app.domain.pharmacy import today
         batch=dict(product_id='med01',batch_number='LOT-TEST',manufacturing_date=(today()-timedelta(days=20)).isoformat(),expiry_date=(today()+timedelta(days=100)).isoformat(),stock=10,mrp=3000,purchase_price=1500)
         self.assertEqual(self.retailer.request('/api/batches',batch)[0],403)
         for changes in [dict(mrp=100),dict(expiry_date='2026-02-30'),dict(manufacturing_date=(today()+timedelta(days=1)).isoformat()),dict(stock=True),dict(purchase_price=5000)]:
@@ -369,7 +369,7 @@ class PortalTests(unittest.TestCase):
         self.assertEqual(Client(self.base).request('/api/register',payload)[0],400)
 
     def test_migration_backup_legacy_orders_and_unallocated_stock(self):
-        from app.store import seed
+        from app.models.store import seed
         path=Path(self.temp.name)/'legacy.json'
         data=seed();data['version']=1
         product=data['products'][0]
@@ -398,7 +398,7 @@ class PortalTests(unittest.TestCase):
         import subprocess
         if not shutil.which('ldapsearch') or not shutil.which('ldapwhoami'):
             self.skipTest('OpenLDAP client tools are unavailable')
-        from app.ldap_server import LDAPServer
+        from app.infrastructure.ldap_server import LDAPServer
         ldap=LDAPServer(('127.0.0.1',0),self.store,license_store=self.license_store)
         thread=threading.Thread(target=ldap.serve_forever,daemon=True);thread.start()
         endpoint='ldap://127.0.0.1:'+str(ldap.server_address[1])
@@ -430,7 +430,7 @@ class PortalTests(unittest.TestCase):
 
     def test_ldap_pending_account_and_failed_rebind(self):
         import socket
-        from app.ldap_server import LDAPServer,tlv,number,octet,message,parse
+        from app.infrastructure.ldap_server import LDAPServer,tlv,number,octet,message,parse
         ldap=LDAPServer(('127.0.0.1',0),self.store,license_store=self.license_store)
         thread=threading.Thread(target=ldap.serve_forever,daemon=True);thread.start()
         def read(connection):
@@ -475,7 +475,7 @@ class PortalTests(unittest.TestCase):
 
     def test_unallocated_legacy_stock_can_only_be_allocated_once(self):
         from datetime import timedelta
-        from app.pharmacy import today
+        from app.domain.pharmacy import today
         with self.store.transaction() as data:
             data['products'][0]['unallocated_stock']=5
         body=dict(product_id='med01',batch_number='HISTORICAL-001',manufacturing_date=(today()-timedelta(days=30)).isoformat(),expiry_date=(today()+timedelta(days=400)).isoformat(),stock=5,mrp=3300,purchase_price=1700,source='unallocated')
@@ -487,7 +487,7 @@ class PortalTests(unittest.TestCase):
 
     def test_dispatch_rechecks_expiry_after_reservation(self):
         from datetime import timedelta
-        from app.pharmacy import today
+        from app.domain.pharmacy import today
         _,order=self.place(quantity=1)
         self.transition(self.distributor,order,'confirmed')
         self.transition(self.distributor,order,'packed')

@@ -4,9 +4,9 @@ import secrets
 import threading
 import time
 
-from app.directory import authenticate, enabled
+from app.auth.directory import authenticate, enabled
 from app.models.domain import Problem, require, safe_user
-from app.ports import LocalOperations
+from app.services.ports import LocalOperations
 
 
 class PortalService:

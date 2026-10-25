@@ -15,9 +15,9 @@ import urllib.error
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from test_portal import Client
 from legacy_server import PortalServer
-from app.store import Store
-from app.licensing import LicenseStore, create_issuer, issue_license, atomic_write
-from app.ldap_server import LDAPServer, parse, number, octet, message, tlv
+from app.models.store import Store
+from app.infrastructure.licensing import LicenseStore, create_issuer, issue_license, atomic_write
+from app.infrastructure.ldap_server import LDAPServer, parse, number, octet, message, tlv
 
 
 class LicensingTests(unittest.TestCase):
@@ -132,21 +132,21 @@ class LicensingTests(unittest.TestCase):
         self.assertEqual(self.licensing.status()['status'],'invalid')
         issue_license(self.private,self.path,'2026-10-24')
         fresh=LicenseStore(self.path,self.public)
-        with patch('app.licensing.shutil.which',return_value=None):
+        with patch('app.infrastructure.licensing.shutil.which',return_value=None):
             self.assertEqual(fresh.status()['status'],'invalid')
         self.assertEqual(self.private.stat().st_mode&0o777,0o600)
         self.assertEqual(self.path.stat().st_mode&0o777,0o600)
         self.assertEqual(self.path.parent.stat().st_mode&0o777,0o700)
 
     def test_transaction_rolls_back_if_license_expires_during_write(self):
-        from app.domain import mutate
+        from app.models.domain import mutate
         before=self.retailer.state()['products'][0]['stock']
         def expire_after_mutation(*args,**kwargs):
             result=mutate(*args,**kwargs)
             self.expire()
             return result
         payload=dict(items=[dict(product_id='med01',quantity=1)],address='Test street',payment_method='cod')
-        with patch('server.mutate',side_effect=expire_after_mutation):
+        with patch('legacy_server.mutate',side_effect=expire_after_mutation):
             self.assertEqual(self.retailer.request('/api/orders',payload,'license-expiry-transaction')[0],423)
         with self.store.transaction() as data:
             self.assertEqual(data['products'][0]['stock'],before)

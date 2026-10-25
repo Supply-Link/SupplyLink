@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.controllers.http import create_app
 from app.services.portal import PortalService
-from app.store import seed
+from app.models.store import seed
 
 
 class MemoryStore:

@@ -49,10 +49,10 @@ def demo_batch(product):
 
 
 def pharmacy_defaults(product, sample=False):
-    product.setdefault('manufacturer', 'Demo manufacturer — replace before use' if sample else '')
-    product.setdefault('hsn_code', '3004' if sample else '')
-    product.setdefault('gst_rate_bps', 500 if sample else None)
-    product.setdefault('storage_conditions', 'Follow the manufacturer label')
+    product.setdefault('manufacturer', '')
+    product.setdefault('hsn_code', '')
+    product.setdefault('gst_rate_bps', None)
+    product.setdefault('storage_conditions', '')
     if 'batches' not in product:
         product['batches'] = [demo_batch(product)] if sample else []
         if not sample and product.get('stock', 0):

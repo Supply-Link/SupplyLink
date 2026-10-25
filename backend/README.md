@@ -14,7 +14,9 @@ The production server is FastAPI. `server.py` constructs the PostgreSQL store an
 - `app/models/store.py`, `relational_store.py`: persistence and transactions.
 - `../frontend/src/screens/`: React views consuming JSON APIs.
 
-The old `app/domain.py`, `store.py`, `relational_store.py`, and `controllers/http.py` are compatibility imports. They do not contain duplicate implementations. LDAP, licensing, and pharmacy helpers remain shared infrastructure/domain utilities.
+Supporting modules are grouped by responsibility: `app/auth/` contains directory authentication, `app/domain/` contains pharmacy rules, `app/infrastructure/` contains LDAP and licence support, and `app/services/` contains ports and application services. The corresponding business and persistence models remain under `app/models/`. `app/controllers/http.py` remains a compatibility entry point for older callers.
+
+`db/seed.json` is the initial demo dataset used only when a database is empty and by the local JSON test adapter. Existing PostgreSQL data is not overwritten by this fixture; runtime edits through the app are persisted to PostgreSQL.
 
 Routers use FastAPI's [multi-file application pattern](https://fastapi.tiangolo.com/tutorial/bigger-applications/). Page responses have explicit models in `/openapi.json`; interactive documentation remains disabled as before.
 
@@ -28,7 +30,7 @@ All routes below are `GET /api/<name>`. They authenticate the session cookie, re
 | `catalog` | Retailer | Active products; batch purchase prices removed |
 | `orders` | Admin, distributor, retailer | Visible orders and delivery users |
 | `deliveries` | Admin, distributor, delivery | Visible orders and delivery users |
-| `payments` | All | Visible orders, associated payments, delivery users |
+| `payments` | Distributor | Visible orders, associated payments, delivery users |
 | `credit` | Admin, retailer | Authorized retailer accounts |
 | `inventory` | Admin, distributor | Authorized products and distributor accounts |
 | `people` | Admin | User accounts |
@@ -39,7 +41,7 @@ All routes below are `GET /api/<name>`. They authenticate the session cookie, re
 | `notifications` | All | Current user's notifications |
 | `shell` | All | Current user's unread notification count |
 
-Unauthorized sessions return 401, disallowed page roles return 403, and unusable licences return 423. Distributor reads are restricted to owned products/orders; retailers see their own orders/payments; delivery users see assigned orders/payments. Existing command endpoints continue enforcing role, ownership, CSRF, and idempotency rules.
+Unauthorized sessions return 401, disallowed page roles return 403, and unusable licences return 423. Distributor reads are restricted to owned products/orders; payment ledger reads are distributor-only; delivery users see assigned deliveries and orders. Existing command endpoints continue enforcing role, ownership, CSRF, and idempotency rules.
 
 `GET /api/state` remains deprecated but functional for mobile compatibility. New web reads do not call it or construct its full snapshot. The PostgreSQL adapter still opens the existing aggregate transaction and loads the normalized data dictionary; this change reduces response payload and projection work, not the database transaction's read scope. Table-specific repository queries can be introduced separately without changing page contracts.
 

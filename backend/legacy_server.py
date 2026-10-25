@@ -12,11 +12,11 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
-from app.store import Store, verify_password
-from app.domain import Problem, require, mutate, snapshot, safe_user, register
-from app.directory import authenticate, enabled
-from app.ldap_server import LDAPServer
-from app.licensing import LicenseStore, DEFAULT_LICENSE, DEFAULT_PUBLIC_KEY
+from app.models.store import Store, verify_password
+from app.models.domain import Problem, require, mutate, snapshot, safe_user, register
+from app.auth.directory import authenticate, enabled
+from app.infrastructure.ldap_server import LDAPServer
+from app.infrastructure.licensing import LicenseStore, DEFAULT_LICENSE, DEFAULT_PUBLIC_KEY
 
 try:
     from dotenv import load_dotenv

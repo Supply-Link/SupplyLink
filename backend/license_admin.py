@@ -3,7 +3,7 @@
 import argparse
 import json
 from pathlib import Path
-from app.licensing import DEFAULT_LICENSE, DEFAULT_PUBLIC_KEY, LicenseStore, create_issuer, issue_license
+from app.infrastructure.licensing import DEFAULT_LICENSE, DEFAULT_PUBLIC_KEY, LicenseStore, create_issuer, issue_license
 
 
 def main():

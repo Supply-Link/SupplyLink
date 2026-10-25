@@ -62,11 +62,14 @@ class PageAPITests(unittest.TestCase):
         ]
         self.store.data['payments'] = [dict(id='own-payment', order_id='own'), dict(id='foreign-payment', order_id='foreign')]
         self.store.data['notifications'] = [dict(id='own-note', user_id='retailer', read=False), dict(id='foreign-note', user_id='admin', read=False)]
-        for role in ('retailer', 'distributor', 'delivery'):
+        for role in ('distributor',):
             self.login(role)
             response = self.client.get('/api/payments').json()
             self.assertEqual([o['id'] for o in response['orders']], ['own'])
             self.assertEqual([p['id'] for p in response['payments']], ['own-payment'])
+        for role in ('admin', 'retailer', 'delivery'):
+            self.login(role)
+            self.assertEqual(self.client.get('/api/payments').status_code, 403)
         self.login('retailer')
         self.assertEqual([n['id'] for n in self.client.get('/api/notifications').json()['notifications']], ['own-note'])
         self.assertEqual(self.client.get('/api/shell').json()['unread_notifications'], 1)

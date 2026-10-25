@@ -1,5 +1,5 @@
 """Shared file-directory authentication for the portal and local LDAP listener."""
-from .store import verify_password
+from app.models.store import verify_password
 BASE_DN = 'dc=supplylink,dc=local'
 
 

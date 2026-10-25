@@ -7,7 +7,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from app.store import Store
+from app.models.store import Store
 
 
 ROOT = Path(__file__).resolve().parent
