@@ -5,7 +5,7 @@ A professional pharmaceutical distribution portal for administrators, distributo
 ## Monorepo layout
 
 - `frontend/` — React and Vite web portal
-- `backend/` — Python API, LDAP service, PostgreSQL persistence, tests, and licence tooling
+- `backend/` — FastAPI, application services, LDAP, PostgreSQL persistence, tests, and licence tooling
 - `mobile/` — Expo/React Native retailer and delivery apps, plus the earlier native Android project
 - `docs/` — shared product documentation
 
@@ -32,6 +32,8 @@ python server.py
 - Base DN: **dc=supplylink,dc=local**
 - Storage: PostgreSQL (`DATABASE_URL`)
 
+`server.py` starts FastAPI through Uvicorn. `backend/app/controllers/` contains the HTTP adapter, `backend/app/services/` the application use cases, and `backend/app/ports.py` the replaceable business operations port. `backend/legacy_server.py` retains the former HTTP adapter for regression tests; it is not the default server. Web and mobile clients keep using the same `/api` paths. The versioned `backend/contracts/supplylink/v1/operations.proto` is a draft internal gRPC boundary for a later component split; this release does not run a gRPC server.
+
 In a second terminal, start the frontend:
 
 ```sh
@@ -45,6 +47,8 @@ npm run dev
 - Registration: **http://127.0.0.1:5173/register**
 
 The frontend uses `VITE_API_BASE_URL=/api` and proxies that same-origin path to `API_PROXY_TARGET`. This preserves session-cookie and CSRF protection. Opening port 8000 directly exposes only the JSON API, not the React application. The PostgreSQL URL is backend-only and must never be added to `frontend/.env`.
+
+The web portal uses Redux Toolkit for authentication, licence, workspace, and quote state. `createAsyncThunk` actions in `frontend/src/state/portalSlice.ts` call the HTTP adapter, and route/data loading displays skeleton placeholders. Existing React Query helpers still manage local form pending and quote lifecycles; the authoritative workspace state is Redux.
 
 Both backend listeners bind to localhost by default; LDAP is always loopback-only. Use `--port 8080 --ldap-port 1390` for alternative backend settings, or `--no-ldap` for the API alone. If a requested port is unavailable, startup fails with an error instead of silently omitting the directory. If the API port changes, update `API_PROXY_TARGET` in `frontend/.env`.
 
@@ -113,7 +117,7 @@ The seed uses a configurable **sample 5% GST rate and HSN heading 3004**, not a 
 
 Retailer places an order → distributor confirms → packs → assigns a delivery partner and dispatches → assigned partner completes delivery. The order timeline has a distinct icon for every stage and cancellation. Notifications are in-portal.
 
-Orders support cash on delivery or internal trade credit. Credit is reserved at placement and released upon cancellation or recorded payment. Payments are **manual records of money received outside the portal**. Record the full delivered order amount and a receipt reference once; duplicate order/payment requests are protected by idempotency keys. There are no real money transfers, partial payments, refunds, or returns. GPS is explicitly shared once by the driver or entered manually; continuous tracking is not implemented.
+Orders support cash on delivery or internal trade credit. Credit is reserved at placement and released upon cancellation or recorded payment. Payments are **manual records of money received outside the portal**. Record the full delivered order amount and a receipt reference once; duplicate order/payment requests are protected by idempotency keys. The retailer app can request a return and web staff can approve or reject that request; physical returns, refunds and credit notes are not processed. GPS is explicitly shared once by the driver or entered manually; continuous tracking is not implemented.
 
 ## Local LDAP directory
 
@@ -165,11 +169,11 @@ cd /path/to/supplylink/backend
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 ```
 
-Tests use a temporary file-backed adapter and isolated HTTP/LDAP ports; they never read `DATABASE_URL` or modify live PostgreSQL records. They cover end-to-end fulfilment/payment, persistence and migration, role/record isolation, approval/rejection, deactivation/session revocation, LDAP clients and failed rebinds, anonymous denial, batch FEFO allocation and cancellation, expired/quarantined stock, invalid dates/MRP, tax breakdowns and immutable snapshots, stale quotes, idempotency, concurrent stock reservation, CSRF, and origin validation. Native LDAP-client checks require `ldapsearch` and `ldapwhoami`; they skip when unavailable.
+Tests use temporary file or memory adapters and isolated HTTP/LDAP ports; they never read `DATABASE_URL` or modify live PostgreSQL records. FastAPI contract tests cover login, workspace access, order writes, CSRF, origin checks, logout and licence lock. The legacy HTTP adapter regression suite continues to cover fulfilment/payment, persistence and migration, role/record isolation, approval/rejection, LDAP, batch allocation, tax snapshots, idempotency and concurrency. Native LDAP-client checks require `ldapsearch` and `ldapwhoami`; they skip when unavailable.
 
 ## Operational limits
 
-This remains a demonstration with demo credentials and Python's development HTTP server. A shared deployment needs proper HTTPS/app hosting, `COOKIE_SECURE=1`, replacement credentials, restricted PostgreSQL network access, recovery workflows, reliable backups, and monitoring. Real pharmaceutical operation also needs validated supplier/licence/tax data, prescription/dispensing requirements, recalls/returns, and cold-chain workflows where relevant. These integrations are not implied by the sample catalog.
+This remains a demonstration with demo credentials. A shared deployment needs a managed Uvicorn process behind HTTPS, `COOKIE_SECURE=1`, replacement credentials, restricted PostgreSQL network access, recovery workflows, reliable backups, and monitoring. Real pharmaceutical operation also needs validated supplier/licence/tax data, prescription/dispensing requirements, physical returns, and cold-chain workflows where relevant. These integrations are not implied by the sample catalog.
 
 Generic medicine references: [CDSCO National List of Essential Medicines 2022](https://cdsco.gov.in/opencms/resources/UploadCDSCOWeb/2018/UploadConsumer/nlem2022.pdf). Batch-label reference: [CDSCO Drugs Rules](https://www.cdsco.gov.in/opencms/opencms/en/Acts-and-rules/Drugs-Rules/).
 

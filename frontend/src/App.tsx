@@ -1,7 +1,7 @@
 import { Component, lazy, Suspense, type ComponentType, type ErrorInfo, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout'
-import { Loading } from './components/ui'
+import { PageSkeleton } from './components/ui'
 import type { Role } from './api/types'
 import { useAuth } from './providers/AppProviders'
 
@@ -29,7 +29,7 @@ const Notifications = lazyScreen(() => import('./screens/AdminScreens'), 'Notifi
 
 function Protected({ children, roles }: { children: ReactNode; roles?: Role[] }) {
   const { user, license, booting } = useAuth()
-  if (booting) return <Loading />
+  if (booting) return <PageSkeleton />
   if (!user) return <Navigate to="/login" replace />
   if (!license?.usable) return <LicenseLock />
   if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />
@@ -50,7 +50,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <Suspense fallback={<Loading />}>
+        <Suspense fallback={<PageSkeleton />}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />

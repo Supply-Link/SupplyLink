@@ -4,11 +4,11 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
-import { api } from '../api/endpoints'
+import { api } from '../state/actions'
 import type { Role } from '../api/types'
 import { ROLE_NAMES, STATE_NAMES } from '../lib/constants'
 import { useAuth } from '../providers/AppProviders'
-import { Button, Loading } from '../components/ui'
+import { Button, PageSkeleton } from '../components/ui'
 
 const loginSchema = z.object({
   email: z.email('Enter a valid email address.'),
@@ -52,7 +52,7 @@ export function Login() {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
   })
-  if (booting) return <Loading />
+  if (booting) return <PageSkeleton />
   if (user) return <Navigate to="/" replace />
   const submit = handleSubmit(async (values) => {
     setServerError('')
@@ -106,7 +106,7 @@ export function Register() {
     resolver: zodResolver(registerSchema),
     defaultValues: { role: 'retailer', state_code: '29', gstin: '', drug_license: '' },
   })
-  if (booting) return <Loading />
+  if (booting) return <PageSkeleton />
   if (user) return <Navigate to="/" replace />
   if (license?.usable === false) return <Navigate to="/login" replace />
   const submit = handleSubmit(async (values) => {

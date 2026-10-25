@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package supplylink.v1;
+
+// Future internal boundary for extracted business components. This contract is
+// not served by the current monolith; clients still use the public HTTP API.
+service BusinessOperations {
+  rpc Execute(CommandRequest) returns (CommandReply);
+  rpc ReadWorkspace(WorkspaceRequest) returns (WorkspaceReply);
+}
+
+message ActorContext {
+  string user_id = 1;
+  string role = 2;
+  string correlation_id = 3;
+}
+
+message CommandRequest {
+  ActorContext actor = 1;
+  string operation = 2;
+  bytes payload_json = 3;
+  string idempotency_key = 4;
+}
+
+message CommandReply {
+  bytes payload_json = 1;
+  string error_code = 2;
+  string error_message = 3;
+}
+
+message WorkspaceRequest {
+  ActorContext actor = 1;
+}
+
+message WorkspaceReply {
+  bytes payload_json = 1;
+  string error_code = 2;
+  string error_message = 3;
+}

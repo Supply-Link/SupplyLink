@@ -13,16 +13,22 @@ SupplyLink is maintained as a monorepo so the web portal, backend, mobile client
 ```text
 supplylink/
 ├── frontend/                 React and Vite web portal
-│   ├── src/api/              API client, endpoint definitions, and types
+│   ├── src/api/              HTTP adapter, endpoint definitions, and types
+│   ├── src/state/            Redux Toolkit store, slice, and async thunks
 │   ├── src/components/       Shared layout, UI, catalog, and order components
 │   ├── src/screens/          Authentication and role-specific screens
 │   ├── src/lib/              Checkout, licence, constants, and helper logic
 │   └── package.json          Frontend scripts and dependencies
 ├── backend/                  Python API and persistence service
+│   ├── app/controllers/      FastAPI HTTP controllers
+│   ├── app/services/         Application use cases and transaction boundary
+│   ├── app/ports.py          Replaceable business operations interface
 │   ├── app/                  Domain, authentication, LDAP, licensing, and stores
+│   ├── contracts/            Versioned future gRPC contracts
 │   ├── db/schema.sql         Normalized PostgreSQL schema and access controls
 │   ├── tests/                Backend workflow, security, and licensing tests
-│   ├── server.py             HTTP API and local LDAP entry point
+│   ├── server.py             FastAPI/Uvicorn and local LDAP entry point
+│   ├── legacy_server.py      Previous HTTP adapter retained for regression tests
 │   ├── migrate_json.py       Legacy JSON/JSONB import utility
 │   ├── license_admin.py      Offline licence administration
 │   └── requirements.txt      Python dependencies
@@ -176,6 +182,20 @@ The new interface provides:
 
 The older native Android applications are retained as reference and evaluation artifacts while the maintained mobile source moves to the two Expo projects.
 
+## Web state and loading architecture
+
+- Redux Toolkit is the web portal's application state store. The `portalSlice` owns the signed-in user, licence state, workspace snapshot, quote result, loading state, and request errors.
+- API requests are made by named `createAsyncThunk` actions in the slice. The HTTP endpoint module is the transport adapter; screen form actions dispatch thunks through a typed promise facade. Successful business writes refresh the workspace snapshot.
+- Authentication and licence changes clear protected workspace data from Redux. Session cookies remain HttpOnly and CSRF tokens are still applied by the HTTP adapter; credentials are not persisted in Redux storage.
+- Every lazy page route has a skeleton fallback. Initial workspace loading and authentication boot use the same page skeleton, while the quote panel has an inline skeleton. Empty and error states remain distinct from loading states. Reduced-motion preferences disable the skeleton animation.
+- React Query remains as a local form/query lifecycle helper during this migration; business API calls and the authoritative workspace state pass through Redux thunks. Removing that helper later is optional and must preserve checkout quote cancellation and form pending states.
+
+## Backend application architecture and future service extraction
+
+The default backend process runs FastAPI on Uvicorn. Its controllers retain the existing `/api` paths and response shapes used by web and mobile clients. Controllers parse and validate HTTP requests, enforce origin and CSRF handling, and map domain errors to JSON responses. `PortalService` owns authentication, licence checks, rate limits, and transaction boundaries. Domain modules retain order, inventory, payment, and return rules. The PostgreSQL store remains the persistence adapter. The optional LDAP listener shares the service's store and licence checker.
+
+`BusinessOperations` is an application port with an in-process implementation. It allows a major domain component to be replaced by a service adapter later without teaching HTTP controllers about its transport. `backend/contracts/supplylink/v1/operations.proto` is a versioned draft for an internal gRPC service; no gRPC server or cross-service network call is deployed in this phase. Before extraction, define component-specific typed protobuf messages, service ownership of data and transactions, deadlines, mutual authentication, idempotency propagation, observability, and a reliable outbox or compensating workflow for operations that cross service boundaries. The public web/mobile contract remains HTTP unless a separate client migration is planned.
+
 ## Mobile app design and screens delivered in this phase
 
 Both React Native apps use NativeWind utility classes and match the web portal's deep green brand, lime accent, pale canvas, rounded white cards, restrained borders, and dark green home hero. Shared mobile components provide consistent headings, buttons, fields, badges, empty states, and spacing. The apps have separate Android and iOS identities and use the same role-scoped backend API.
@@ -315,7 +335,10 @@ The phase is accepted when:
 - the frontend and backend run independently, with `/api` requests securely proxied to the backend;
 - backend health reports PostgreSQL storage and saved changes remain available after a backend restart;
 - neither the frontend build nor its environment files contain PostgreSQL credentials;
-- automated frontend and backend checks pass.
+- automated frontend and backend checks pass;
+- web pages show skeleton placeholders while their route or workspace data loads, and all web API actions pass through Redux async thunks;
+- FastAPI preserves the web/mobile `/api` contract, authentication, CSRF and licence rules, including proof-of-delivery and return workflows;
+- the in-process business operations port and versioned gRPC draft are documented without requiring a separate service deployment.
 
 ## Timeline and commercial estimate
 

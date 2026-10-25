@@ -1,11 +1,13 @@
 /* oxlint-disable react/only-export-components */
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { api } from '../api/endpoints'
+import { api } from '../state/actions'
 import { clearApiSession, configureApi } from '../api/client'
 import type { AuthResponse, LicenseStatus, User } from '../api/types'
 import { applyLicenseCachePolicy } from '../lib/license'
 import { ToastVisual } from '../components/ui'
+import { clearSession, setAuth, setLicense as setLicenseAction } from '../state/portalSlice'
+import { useAppDispatch, useAppSelector } from '../state/store'
 
 interface AuthContextValue {
   user: User | null
@@ -22,26 +24,27 @@ const ToastContext = createContext<(message: string, tone?: 'success' | 'error')
 
 function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
-  const [user, setUser] = useState<User | null>(null)
-  const [license, setLicense] = useState<LicenseStatus | null>(null)
+  const dispatch = useAppDispatch()
+  const user = useAppSelector((state) => state.portal.user)
+  const license = useAppSelector((state) => state.portal.license)
   const [booting, setBooting] = useState(true)
 
   const applyLicense = useCallback((status: LicenseStatus) => {
-    setLicense(status)
+    dispatch(setLicenseAction(status))
     applyLicenseCachePolicy(queryClient, status)
-  }, [queryClient])
+  }, [dispatch, queryClient])
 
   const reset = useCallback(() => {
-    setUser(null)
+    dispatch(clearSession())
     clearApiSession()
     queryClient.clear()
-  }, [queryClient])
+  }, [dispatch, queryClient])
 
   const applyAuth = useCallback((response: AuthResponse) => {
     configureApi({ csrf: response.csrf })
-    setUser(response.user)
+    dispatch(setAuth(response))
     applyLicense(response.license)
-  }, [applyLicense])
+  }, [applyLicense, dispatch])
 
   useEffect(() => {
     configureApi({ licenseBlocked: applyLicense, unauthorized: reset })

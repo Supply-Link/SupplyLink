@@ -26,3 +26,6 @@ mobile/*.jks
 mobile/*.keystore
 mobile/*-check.log
 mobile/backend-tests.log
+
+backend/.deps/
+frontend/.npm-cache/

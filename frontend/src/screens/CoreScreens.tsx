@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { api } from '../api/endpoints'
+import { api } from '../state/actions'
 import { createIdempotencyKey } from '../api/client'
 import type { AppState, Order, OrderStatus, Product } from '../api/types'
 import { ORDER_STATUSES } from '../lib/constants'
@@ -192,7 +192,7 @@ function Cart({
   }
   return <Modal title="Review your medicine order" subtitle="Batch allocation and tax are checked by the server." onClose={close} wide>
     {!items.length ? <Empty title="Your order is empty">Add medicines from the catalog to start a new order.</Empty> : <>
-      {quote.isLoading && <p>Calculating current stock and tax…</p>}
+      {quote.isLoading && <div className="skeleton-card" aria-label="Calculating current stock and tax" aria-busy="true"><div className="skeleton-line" /><div className="skeleton-line skeleton-short" /><div className="skeleton-line skeleton-tiny" /></div>}
       {quote.error && <Notice tone="amber">{quote.error.message}</Notice>}
       {quote.data && <>
         {quote.data.lines.map((line) => <div className="cart-line" key={line.product_id}><div><strong>{line.name}</strong><small>{line.unit} · HSN {line.hsn_code} · GST {line.gst_rate_bps! / 100}%</small></div><QuantityStepper value={line.quantity} label={line.name} onDecrement={() => change(line.product_id, -1)} onIncrement={() => change(line.product_id, 1)} /><strong>{money(line.total)}</strong></div>)}

@@ -4,8 +4,10 @@ import sys
 import tempfile
 import threading
 from pathlib import Path
+import uvicorn
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'backend'))
-from server import PortalServer
+from app.controllers.http import create_app
+from app.services.portal import PortalService
 from app.store import Store
 from app.licensing import LicenseStore, create_issuer, issue_license
 
@@ -18,16 +20,17 @@ with tempfile.TemporaryDirectory(prefix='supplylink-android-qa-') as temporary:
         path = root / mode / 'secrets' / 'license.json'
         if mode != 'unconfigured':
             issue_license(private, path, '2099-12-31' if mode.startswith('active') else '2020-01-01', 'Disposable Android QA fixture')
-        server = PortalServer(('127.0.0.1', port), Store(root / mode / 'portal.json'), LicenseStore(path, public))
-        server.RequestHandlerClass.log_message = lambda *args: None
-        servers.append(server)
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+        portal = PortalService(Store(root / mode / 'portal.json'), LicenseStore(path, public))
+        server = uvicorn.Server(uvicorn.Config(create_app(portal), host='127.0.0.1', port=port, log_level='warning'))
+        thread = threading.Thread(target=server.run, daemon=True)
+        servers.append((server, thread))
+        thread.start()
         print(f'Android QA: localhost:{port} ({mode})', flush=True)
     try:
         threading.Event().wait()
     except KeyboardInterrupt:
         pass
     finally:
-        for server in servers:
-            server.shutdown()
-            server.server_close()
+        for server, thread in servers:
+            server.should_exit = True
+            thread.join(timeout=5)

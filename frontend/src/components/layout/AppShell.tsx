@@ -1,14 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import {
   Activity, Bell, Boxes, Building2, ClipboardList, CreditCard, LayoutDashboard, LogOut,
   Menu, PackageCheck, Settings2, ShieldCheck, ShoppingBasket, Truck, Users, WalletCards,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { api } from '../../api/endpoints'
+import { api } from '../../state/actions'
+import { useAppSelector } from '../../state/store'
 import type { Role } from '../../api/types'
 import { ROLE_NAMES } from '../../lib/constants'
 import { useAuth } from '../../providers/AppProviders'
-import { Avatar, IconButton, Loading } from '../ui'
+import { Avatar, IconButton, PageSkeleton } from '../ui'
 
 const nav = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, roles: ['admin', 'distributor', 'retailer', 'delivery'] },
@@ -35,13 +36,12 @@ const todayLabel = new Date().toLocaleDateString('en-IN', {
 
 export function AppShell() {
   const { user, license, logout } = useAuth()
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['state'],
-    queryFn: api.state,
-    enabled: Boolean(user && license?.usable),
-  })
-  if (isLoading) return <Loading />
-  if (error || !data || !user) throw error ?? new Error('Workspace data is unavailable.')
+  const data = useAppSelector((state) => state.portal.workspace)
+  const status = useAppSelector((state) => state.portal.workspaceStatus)
+  const error = useAppSelector((state) => state.portal.error)
+  useEffect(() => { if (user && license?.usable && status === 'idle') void api.state() }, [user, license?.usable, status])
+  if (!data && status !== 'error') return <PageSkeleton />
+  if (error || !data || !user) throw new Error(error ?? 'Workspace data is unavailable.')
   const unread = data.notifications.filter((item) => !item.read).length
   return <div className="shell">
     <aside className="sidebar" id="sidebar">
