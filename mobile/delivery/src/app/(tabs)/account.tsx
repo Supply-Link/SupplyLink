@@ -1,4 +1,5 @@
-import { Banknote, LogOut, RefreshCw } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Banknote, CircleHelp, LogOut, RefreshCw } from 'lucide-react-native';
 import { Text } from 'react-native';
 import { Button, Card, EmptyState, Muted, Screen, SectionLabel, Title } from '@/components/ui';
 import { APP } from '@/lib/config';
@@ -6,6 +7,7 @@ import { dateTime, money } from '@/lib/rules';
 import { useSession } from '@/session/SessionProvider';
 
 export default function AccountScreen() {
+  const router = useRouter();
   const { user, workspace, licence, serverUrl, refresh, signOut } = useSession();
   const payments = workspace?.payments ?? [];
 
@@ -37,6 +39,7 @@ export default function AccountScreen() {
         </Card>
       ))}
 
+      <Button title="Help & support" icon={CircleHelp} variant="secondary" onPress={() => router.push('/help')} />
       <Button title="Refresh account" icon={RefreshCw} variant="secondary" onPress={refresh} />
       <Button title="Sign out" icon={LogOut} variant="danger" onPress={signOut} />
     </Screen>

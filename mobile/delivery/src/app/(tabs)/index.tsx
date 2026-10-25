@@ -3,7 +3,6 @@ import { Bell, LayoutGrid, RefreshCw, Truck } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 import { OrderCard } from '@/components/orders';
 import { Button, Card, colors, EmptyState, Muted, Screen, SectionLabel } from '@/components/ui';
-import { APP } from '@/lib/config';
 import { isActive } from '@/lib/rules';
 import { useSession } from '@/session/SessionProvider';
 
@@ -15,8 +14,11 @@ export default function HomeScreen() {
 
   return (
     <Screen title="Home" subtitle={user?.business ?? user?.name} onRefresh={refresh}>
-      <Text className="mt-2 text-2xl font-bold text-ink">Hello, {user?.name.split(' ')[0]}</Text>
-      <Muted className="text-[15px]">{APP.greeting}</Muted>
+      <View className="mt-2 rounded-card bg-brand px-5 py-6">
+        <Text className="text-xs font-bold uppercase tracking-widest text-brand-accent">A clearer view. A better day.</Text>
+        <Text className="mt-3 text-[25px] font-semibold leading-8 text-white">Every delivery makes a difference.</Text>
+        <Text className="mt-2 text-sm leading-5 text-brand-mist">Your assigned orders, handoffs and collections in one connected workspace.</Text>
+      </View>
 
       <Card>
         <View className="flex-row items-center">

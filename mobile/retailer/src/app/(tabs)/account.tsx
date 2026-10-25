@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Banknote, Building, LogOut, RefreshCw } from 'lucide-react-native';
+import { Banknote, Building, CircleHelp, CreditCard, FileText, LogOut, RefreshCw } from 'lucide-react-native';
 import { Text } from 'react-native';
 import { Body, Button, Card, EmptyState, Muted, Screen, SectionLabel, Title } from '@/components/ui';
 import { APP } from '@/lib/config';
@@ -33,6 +33,10 @@ export default function AccountScreen() {
           Software licence: {licence.status ?? '—'} · Expiry: {licence.expires_on ?? '—'}
         </Muted>
       </Card>
+
+      <Button title="Credit & payments" icon={CreditCard} variant="secondary" onPress={() => router.push('/finance')} />
+      <Button title="Order records & returns" icon={FileText} variant="secondary" onPress={() => router.push('/records')} />
+      <Button title="Help & support" icon={CircleHelp} variant="secondary" onPress={() => router.push('/help')} />
 
       <SectionLabel>Payment history</SectionLabel>
       {payments.length === 0 ? <EmptyState message="No payments recorded." icon={Banknote} /> : null}

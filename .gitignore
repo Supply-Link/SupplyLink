@@ -15,6 +15,11 @@ backend/config/license-public.pem
 
 # Android build outputs and local machine configuration
 mobile/.gradle/
+mobile/.npm-cache/
+mobile/*/node_modules/
+mobile/*/.expo/
+mobile/*/.expo-export-*/
+mobile/.expo-cli-home/
 mobile/local.properties
 mobile/**/build/
 mobile/*.jks

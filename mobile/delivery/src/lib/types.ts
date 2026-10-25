@@ -95,6 +95,23 @@ export interface Quote extends TaxTotals {
   tax_type: string;
 }
 
+export interface ProofOfDelivery {
+  recipient_name: string;
+  signature: number[][][];
+  captured_at: string;
+  captured_by: string;
+}
+
+export interface ReturnRequest {
+  id: string;
+  order_id: string;
+  status: 'requested' | 'approved' | 'rejected';
+  reason: string;
+  requested_at: string;
+  review_note?: string;
+  reviewed_at?: string;
+}
+
 export interface Order extends TaxTotals {
   id: string;
   number: string;
@@ -109,6 +126,8 @@ export interface Order extends TaxTotals {
   lines: OrderLine[];
   history: { status: OrderStatus; at: string; by: string }[];
   tracking: { latitude: number; longitude: number; at: string }[];
+  proof_of_delivery?: ProofOfDelivery;
+  return_request?: ReturnRequest;
 }
 
 export interface Notification {

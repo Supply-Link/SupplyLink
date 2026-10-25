@@ -80,6 +80,8 @@ export default function OrderScreen() {
         <Timeline history={order.history} />
       </Card>
 
+      {order.proof_of_delivery ? <Card><Title>Proof of delivery</Title><Body>Received by {order.proof_of_delivery.recipient_name}</Body><Muted>{dateTime(order.proof_of_delivery.captured_at)}</Muted></Card> : null}
+
       {latest ? (
         <Card>
           <View className="flex-row items-center">
@@ -99,6 +101,7 @@ export default function OrderScreen() {
 }
 
 function DeliveryActions({ order }: { order: Order }) {
+  const router = useRouter();
   const toast = useToast();
   const { request, refresh, keyFor, dropKey, showError, busy } = useSession();
   const [manualOpen, setManualOpen] = useState(false);
@@ -144,17 +147,6 @@ function DeliveryActions({ order }: { order: Order }) {
     }
   };
 
-  const markDelivered = () =>
-    Alert.alert('Confirm delivery', 'Has the customer received this order?', [
-      { text: 'Back', style: 'cancel' },
-      {
-        text: 'Delivered',
-        onPress: async () => {
-          if (await request('POST', `/api/orders/${order.id}`, { status: 'delivered' })) await refresh();
-        },
-      },
-    ]);
-
   const recordCollection = async () => {
     const ref = reference.trim();
     if (!ref) {
@@ -193,7 +185,7 @@ function DeliveryActions({ order }: { order: Order }) {
             onPress={shareCurrent}
           />
           <Button title="Enter location manually" icon={PencilLine} variant="secondary" onPress={() => setManualOpen(true)} />
-          <Button title="Mark as delivered" icon={PackageCheck} disabled={busy} onPress={markDelivered} />
+          <Button title="Capture signature & deliver" icon={PackageCheck} disabled={busy} onPress={() => router.push({ pathname: '/proof/[id]', params: { id: order.id } })} />
         </Card>
       ) : null}
 

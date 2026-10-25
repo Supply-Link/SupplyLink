@@ -18,11 +18,11 @@ import { APP } from '@/lib/config';
 import { useSession } from '@/session/SessionProvider';
 
 export const colors = {
-  brand: '#153e35',
-  ink: '#203d35',
-  muted: '#78877f',
-  soft: '#b6d8c0',
-  danger: '#b42318',
+  brand: '#173d34',
+  ink: '#243c33',
+  muted: '#7c827e',
+  soft: '#edf3e7',
+  danger: '#a54542',
   white: '#ffffff',
 };
 
@@ -54,7 +54,7 @@ export function Screen({ title, subtitle, onBack, onRefresh, bottomInset, childr
       className="flex-1 bg-canvas"
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View className="bg-brand px-5 pb-4" style={{ paddingTop: insets.top + 12 }}>
+      <View className="bg-brand px-5 pb-5" style={{ paddingTop: insets.top + 12 }}>
         <View className="flex-row items-center">
           {onBack ? (
             <Pressable
@@ -72,14 +72,14 @@ export function Screen({ title, subtitle, onBack, onRefresh, bottomInset, childr
             SUPPLYLINK / {APP.roleLabel.toUpperCase()}
           </Text>
         </View>
-        <Text className="mt-2 text-[27px] font-bold text-white" numberOfLines={2}>
+        <Text className="mt-3 text-[28px] font-semibold tracking-tight text-white" numberOfLines={2}>
           {title}
         </Text>
         {subtitle ? <Text className="mt-1 text-[13px] text-brand-mist">{subtitle}</Text> : null}
       </View>
       <ScrollView
         className="flex-1"
-        contentContainerClassName="px-5 pt-3"
+        contentContainerClassName="px-5 pt-4"
         contentContainerStyle={{ paddingBottom: (bottomInset ? insets.bottom : 0) + 28 }}
         keyboardShouldPersistTaps="handled"
         refreshControl={
@@ -94,7 +94,7 @@ export function Screen({ title, subtitle, onBack, onRefresh, bottomInset, childr
 }
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <View className={`mt-2.5 rounded-card border border-line bg-white px-4 py-3.5 ${className}`}>{children}</View>;
+  return <View className={`mt-3 rounded-card border border-line bg-white px-4 py-4 ${className}`}>{children}</View>;
 }
 
 export function Title({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -157,7 +157,7 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor="#9aa8a0"
-        className="rounded-xl border border-[#dce4de] bg-white px-3 py-2.5 text-base text-ink"
+        className="rounded-xl border border-line bg-white px-3 py-2.5 text-base text-ink"
         {...props}
       />
     </View>
@@ -225,7 +225,7 @@ export function Select({
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${current?.label ?? 'not selected'}`}
         onPress={() => setOpen(true)}
-        className="flex-row items-center justify-between rounded-xl border border-[#dce4de] bg-white px-3 py-3"
+        className="flex-row items-center justify-between rounded-xl border border-line bg-white px-3 py-3"
       >
         <Text className="flex-1 text-base text-ink" numberOfLines={1}>
           {current?.label ?? 'Select…'}

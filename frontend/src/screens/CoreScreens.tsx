@@ -29,6 +29,7 @@ function OrderDetail({ order, onClose }: { order: Order; onClose: () => void }) 
   const queryClient = useQueryClient()
   const [driverId, setDriverId] = useState('')
   const [reference, setReference] = useState('')
+  const [reviewNote, setReviewNote] = useState('')
   const [coordinates, setCoordinates] = useState({ latitude: '', longitude: '' })
   const [confirmCancel, setConfirmCancel] = useState(false)
   const paymentKey = useRef(createIdempotencyKey())
@@ -50,6 +51,11 @@ function OrderDetail({ order, onClose }: { order: Order; onClose: () => void }) 
   const trackingMutation = useMutation({
     mutationFn: () => api.track({ order_id: order.id, latitude: Number(coordinates.latitude), longitude: Number(coordinates.longitude) }),
     onSuccess: () => void refresh('Delivery location shared.'),
+    onError: (error) => toast(error.message, 'error'),
+  })
+  const returnMutation = useMutation({
+    mutationFn: (action: 'approve' | 'reject') => api.reviewReturn({ order_id: order.id, action, review_note: reviewNote.trim() }),
+    onSuccess: () => void refresh('Return request reviewed.'),
     onError: (error) => toast(error.message, 'error'),
   })
   const canManage = user?.role === 'admin' || user?.role === 'distributor'
@@ -88,6 +94,8 @@ function OrderDetail({ order, onClose }: { order: Order; onClose: () => void }) 
         <Card className="inset"><h3>Delivery information</h3><p>{order.address}</p><p>Partner: {driver?.name ?? 'Not yet assigned'}</p>{latest && <p>Last location: <b>{latest.latitude.toFixed(5)}, {latest.longitude.toFixed(5)}</b><br />{dateTime(latest.at)}</p>}</Card>
         <Card className="inset"><h3>Order timeline</h3><Timeline entries={order.history} /></Card>
       </div>
+      {order.proof_of_delivery && <Card className="inset"><h3>Proof of delivery</h3><p>Signed by {order.proof_of_delivery.recipient_name} on {dateTime(order.proof_of_delivery.captured_at)}.</p><svg viewBox="0 0 1000 1000" role="img" aria-label="Recipient signature" style={{ width: '100%', maxWidth: 360, height: 128, border: '1px solid #e5e8e3', borderRadius: 12, background: '#fff' }} preserveAspectRatio="none">{order.proof_of_delivery.signature.map((stroke, index) => <polyline key={index} points={stroke.map(([x, y]) => `${x},${y}`).join(' ')} fill="none" stroke="#173d34" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />)}</svg></Card>}
+      {order.return_request && <Card className="inset"><h3>Return request</h3><p><Badge value={order.return_request.status} /> Requested {dateTime(order.return_request.requested_at)}</p><p>{order.return_request.reason}</p>{order.return_request.review_note && <p>Review: {order.return_request.review_note}</p>}{canManage && order.return_request.status === 'requested' && <><Notice tone="amber">Approval records the decision only. Stock, payment, refunds and credit notes require separate handling.</Notice><div className="inline-form"><input aria-label="Return review note" value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} placeholder="Reason for your decision" maxLength={500} /><Button disabled={!reviewNote.trim() || returnMutation.isPending} onClick={() => returnMutation.mutate('approve')}>Approve request</Button><Button variant="danger" disabled={!reviewNote.trim() || returnMutation.isPending} onClick={() => returnMutation.mutate('reject')}>Reject request</Button></div></>}</Card>}
       <div className="order-actions">
         {canManage && order.status === 'placed' && <Button onClick={() => statusMutation.mutate({ status: 'confirmed' })}>Confirm order</Button>}
         {canManage && order.status === 'confirmed' && <Button onClick={() => statusMutation.mutate({ status: 'packed' })}>Mark as packed</Button>}

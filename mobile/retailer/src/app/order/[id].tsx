@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CircleX, MapPin, Package, RefreshCw } from 'lucide-react-native';
+import { CircleX, FileText, MapPin, Package, RefreshCw, RotateCcw } from 'lucide-react-native';
 import { Alert, Text, View } from 'react-native';
 import { StageBadge, Timeline, Totals } from '@/components/orders';
 import { Body, Button, Card, colors, EmptyState, Muted, Screen, Title } from '@/components/ui';
@@ -85,6 +85,11 @@ export default function OrderScreen() {
         <Title>Order timeline</Title>
         <Timeline history={order.history} />
       </Card>
+
+      {order.proof_of_delivery ? <Card><Title>Proof of delivery</Title><Body>Received by {order.proof_of_delivery.recipient_name}</Body><Muted>{dateTime(order.proof_of_delivery.captured_at)}</Muted></Card> : null}
+
+      <Button title="View transaction record" icon={FileText} variant="secondary" onPress={() => router.push({ pathname: '/statement/[id]', params: { id: order.id } })} />
+      {order.status === 'delivered' ? <Button title={order.return_request ? `Return ${order.return_request.status}` : 'Request a return'} icon={RotateCcw} variant="secondary" onPress={() => router.push({ pathname: '/return/[id]', params: { id: order.id } })} /> : null}
 
       {latest ? (
         <Card>

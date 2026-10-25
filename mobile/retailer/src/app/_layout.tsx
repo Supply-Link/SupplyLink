@@ -34,7 +34,7 @@ function Routes() {
   if (!hydrated) return <View className="flex-1 bg-brand" />;
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#f4f7f4' } }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#f6f7f3' } }}>
       <Stack.Protected guard={phase === 'signedOut'}>
         <Stack.Screen name="sign-in" />
         <Stack.Screen name="register" />
@@ -49,6 +49,11 @@ function Routes() {
         <Stack.Screen name="review" />
         <Stack.Screen name="business" />
         <Stack.Screen name="alerts" />
+        <Stack.Screen name="finance" />
+        <Stack.Screen name="help" />
+        <Stack.Screen name="records" />
+        <Stack.Screen name="statement/[id]" />
+        <Stack.Screen name="return/[id]" />
       </Stack.Protected>
     </Stack>
   );

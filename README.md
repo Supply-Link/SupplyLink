@@ -6,7 +6,7 @@ A professional pharmaceutical distribution portal for administrators, distributo
 
 - `frontend/` — React and Vite web portal
 - `backend/` — Python API, LDAP service, PostgreSQL persistence, tests, and licence tooling
-- `mobile/` — native Android retailer and delivery apps
+- `mobile/` — Expo/React Native retailer and delivery apps, plus the earlier native Android project
 - `docs/` — shared product documentation
 
 ## Start
@@ -226,7 +226,11 @@ This is offline enforcement on a trusted host: an owner who can alter applicatio
 
 The full test suite also covers signature tampering, wrong keys, unsafe permissions, absent/corrupt files, exact India-midnight boundaries, every role's expired login/logout, all business endpoints blocked without data changes, pre-expiry sessions, expiry during a transaction, LDAP bind/search separation, and live renewal without restart. Test-only licences use isolated keys/files and do not set your installation's commercial expiry.
 
-## Native Android apps
+## Cross-platform mobile apps
+
+The primary mobile workspaces are [`mobile/retailer/`](mobile/retailer/) and [`mobile/delivery/`](mobile/delivery/). Both use Expo, React Native, Expo Router, TypeScript, and NativeWind/Tailwind styles. They implement the retailer and delivery workflows below for Android and iOS. See [`mobile/README.md`](mobile/README.md) for development, checks, and EAS build commands. The existing native Java project and its evaluation APKs are retained separately.
+
+## Earlier native Android apps
 
 The `mobile/` Gradle project builds two native Java apps for Android 8.0 and later:
 

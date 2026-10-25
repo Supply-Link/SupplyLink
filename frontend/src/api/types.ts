@@ -134,6 +134,23 @@ export interface Order {
   buyer?: Partial<User>
   history: Array<{ status: OrderStatus; at: string; by: string }>
   tracking: Array<{ latitude: number; longitude: number; at: string }>
+  proof_of_delivery?: {
+    recipient_name: string
+    signature: number[][][]
+    captured_at: string
+    captured_by: string
+  }
+  return_request?: ReturnRequest
+}
+
+export interface ReturnRequest {
+  id: string
+  order_id: string
+  status: 'requested' | 'approved' | 'rejected'
+  reason: string
+  requested_at: string
+  review_note?: string
+  reviewed_at?: string
 }
 
 export interface Quote {

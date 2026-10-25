@@ -88,7 +88,7 @@ class LicensingTests(unittest.TestCase):
     def test_all_business_and_registration_routes_are_blocked_without_mutation(self):
         self.expire()
         with self.store.transaction() as data: before=copy.deepcopy(data)
-        routes=('/api/orders','/api/orders/example','/api/quote','/api/payments','/api/inventory','/api/batches','/api/batches/quarantine','/api/business','/api/products','/api/pricing','/api/users','/api/registrations/approve','/api/registrations/reject','/api/tracking','/api/notifications/read','/api/register','/api/not-a-real-route')
+        routes=('/api/orders','/api/orders/example','/api/quote','/api/payments','/api/proof-of-delivery','/api/returns','/api/inventory','/api/batches','/api/batches/quarantine','/api/business','/api/products','/api/pricing','/api/users','/api/registrations/approve','/api/registrations/reject','/api/tracking','/api/notifications/read','/api/register','/api/not-a-real-route')
         for route in routes:
             with self.subTest(route=route):
                 self.assertEqual(self.admin.request(route,{})[0],423)

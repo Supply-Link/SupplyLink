@@ -277,6 +277,67 @@ def record_payment(data, user, body, key):
     return payment
 
 
+def capture_proof(data, user, body, key):
+    """Save a compact signature and complete the assigned delivery atomically."""
+    role(user, 'delivery')
+    order = get_order(data, user, body.get('order_id'))
+    require(isinstance(key, str) and 8 <= len(key) <= 120, 'An idempotency key is required.')
+    existing = order.get('proof_of_delivery')
+    if existing:
+        require(existing.get('request_key') == key, 'Proof of delivery is already recorded.', 409)
+        return existing
+    require(order['status'] == 'out_for_delivery', 'Proof requires an active delivery.', 409)
+    recipient = text(body.get('recipient_name'), 'Recipient name', 100)
+    strokes = body.get('signature')
+    require(isinstance(strokes, list) and 1 <= len(strokes) <= 20, 'Draw a recipient signature.')
+    point_count = 0
+    for stroke in strokes:
+        require(isinstance(stroke, list) and 2 <= len(stroke) <= 200, 'Signature stroke is invalid.')
+        for point in stroke:
+            require(isinstance(point, list) and len(point) == 2 and
+                    all(isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 1000 for value in point),
+                    'Signature coordinates are invalid.')
+            point_count += 1
+    require(4 <= point_count <= 1500, 'Draw a complete recipient signature.')
+    proof = dict(recipient_name=recipient, signature=strokes, captured_at=now(), captured_by=user['id'], request_key=key)
+    order['proof_of_delivery'] = proof
+    update_order(data, user, order['id'], {'status': 'delivered'})
+    audit(data, user, 'Proof of delivery recorded', order['number'])
+    return proof
+
+
+def manage_return(data, user, body, key):
+    """Request or review a return. No stock or payment movement occurs here."""
+    order = get_order(data, user, body.get('order_id'))
+    action = body.get('action')
+    if action == 'request':
+        role(user, 'retailer')
+        require(order['status'] == 'delivered', 'Request a return after delivery.', 409)
+        require(isinstance(key, str) and 8 <= len(key) <= 120, 'An idempotency key is required.')
+        existing = order.get('return_request')
+        if existing:
+            require(existing.get('request_key') == key, 'A return request already exists for this order.', 409)
+            return existing
+        result = dict(id=uid('ret'), order_id=order['id'], status='requested',
+                      reason=text(body.get('reason'), 'Return reason', 500), requested_at=now(),
+                      requested_by=user['id'], request_key=key)
+        order['return_request'] = result
+        notify(data, order['distributor_id'], 'Return requested', order['number'] + ': review the retailer request.')
+        audit(data, user, 'Return requested', order['number'])
+        return result
+    require(action in ('approve', 'reject'), 'Choose a valid return action.')
+    role(user, 'admin', 'distributor')
+    result = order.get('return_request')
+    require(result is not None, 'No return request exists.', 404)
+    require(result['status'] == 'requested', 'This return request is already reviewed.', 409)
+    result.update(status='approved' if action == 'approve' else 'rejected',
+                  review_note=text(body.get('review_note'), 'Review note', 500),
+                  reviewed_at=now(), reviewed_by=user['id'])
+    notify(data, order['retailer_id'], 'Return request ' + result['status'], order['number'] + ': ' + result['review_note'])
+    audit(data, user, 'Return request ' + result['status'], order['number'])
+    return result
+
+
 def snapshot(data, user):
     orders = visible_orders(data, user)
     order_ids = {o['id'] for o in orders}
@@ -352,6 +413,10 @@ def mutate(data, user, path, body, key):
         return quote(data, body.get('items'), body.get('supply_state_code', user.get('state_code', '29')))
     if path == '/api/payments':
         return record_payment(data, user, body, key)
+    if path == '/api/proof-of-delivery':
+        return capture_proof(data, user, body, key)
+    if path == '/api/returns':
+        return manage_return(data, user, body, key)
     if path in ('/api/inventory', '/api/batches', '/api/batches/quarantine'):
         role(user, 'admin', 'distributor')
         p = find(data['products'], 'id', body.get('product_id'))

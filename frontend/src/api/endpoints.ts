@@ -1,7 +1,7 @@
 import { request } from './client'
 import type {
   AppState, AuthResponse, Batch, BatchInput, BusinessInput, LicenseStatus, NewUserInput,
-  Order, OrderStatus, Payment, Product, ProductInput, Quote, Role, User,
+  Order, OrderStatus, Payment, Product, ProductInput, Quote, ReturnRequest, Role, User,
 } from './types'
 
 export const api = {
@@ -29,6 +29,8 @@ export const api = {
     request<Payment>('/api/payments', { body, idempotencyKey }),
   track: (body: { order_id: string; latitude: number; longitude: number }) =>
     request<{ latitude: number; longitude: number; at: string }>('/api/tracking', { body }),
+  reviewReturn: (body: { order_id: string; action: 'approve' | 'reject'; review_note: string }) =>
+    request<ReturnRequest>('/api/returns', { body }),
   updateUser: (body: { id: string; credit_limit?: number; active?: boolean }) =>
     request<User>('/api/users', { body }),
   createUser: (body: NewUserInput) => request<User>('/api/users', { body }),

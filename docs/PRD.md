@@ -29,6 +29,7 @@ supplylink/
 ├── mobile/                   Mobile application workspaces
 │   ├── app/                  Native Android retailer and delivery source
 │   ├── retailer/             Expo/React Native retailer workspace
+│   ├── delivery/             Expo/React Native delivery workspace
 │   ├── tools/                Mobile packaging and QA backend utilities
 │   └── dist/                 Evaluation APKs and distribution artifacts
 ├── docs/
@@ -60,6 +61,7 @@ SupplyLink brings these activities into one controlled workflow.
 4. Preserve the batch and tax information recorded when an order was placed.
 5. Give administrators clear control over people, roles, approvals, and trade-credit limits.
 6. Provide a simple interface that works on desktop, tablet, and mobile screens.
+7. Provide Android and iOS retailer and delivery apps with the same visual language as the web portal.
 
 ## Users and responsibilities
 
@@ -76,6 +78,7 @@ SupplyLink brings these activities into one controlled workflow.
 - Confirms and packs retailer orders.
 - Assigns packed orders to delivery partners.
 - Reviews deliveries and records received payments.
+- Reviews retailer return requests and records an approval or rejection with a reason.
 
 ### Retailer or pharmacy
 
@@ -83,6 +86,7 @@ SupplyLink brings these activities into one controlled workflow.
 - Reviews pack price, GST, stock, batch, MRP, and expiry information.
 - Places cash-on-delivery or trade-credit orders.
 - Tracks order progress, payments, and available credit.
+- Views saved order transaction records and requests a return after delivery.
 - Maintains its business and GST profile.
 
 ### Delivery partner
@@ -91,6 +95,7 @@ SupplyLink brings these activities into one controlled workflow.
 - Reviews the delivery address and relevant order details.
 - Shares a location only when explicitly requested.
 - Confirms delivery and records collection information.
+- Captures the recipient's name and signature when completing a delivery in the mobile app.
 
 ## Current product capabilities
 
@@ -126,9 +131,13 @@ The supported order journey is:
 2. Distributor confirms it.
 3. Distributor marks it packed.
 4. Distributor assigns a delivery partner and dispatches it.
-5. Delivery partner confirms delivery.
+5. Delivery partner records the recipient's name and signature and confirms delivery in the mobile app.
 
 Each order includes a timeline. Eligible unpaid orders may be cancelled before dispatch, returning reserved stock and trade credit.
+
+The mobile proof-of-delivery action saves a compact signature and changes the assigned order to delivered in one server transaction. The signed recipient and time are visible on the order in both mobile apps and the web portal. Web staff can still complete an order through the existing order action without capturing a signature; signature capture is a mobile delivery workflow.
+
+After delivery, a retailer can submit one return request per order with a reason. A distributor or administrator can approve or reject it with a review note in the web order detail. The retailer sees the status and decision in the mobile app. This is a request and decision workflow; approval does not restock goods, adjust trade credit, refund money, or issue a credit note.
 
 ### Payments and trade credit
 
@@ -165,7 +174,17 @@ The new interface provides:
 - reusable feature components so future screens can be added more quickly;
 - automated frontend tests for core formatting, API safeguards, tables, checkout data, and licence handling.
 
-The existing Android retailer and delivery applications are not redesigned in this phase.
+The older native Android applications are retained as reference and evaluation artifacts while the maintained mobile source moves to the two Expo projects.
+
+## Mobile app design and screens delivered in this phase
+
+Both React Native apps use NativeWind utility classes and match the web portal's deep green brand, lime accent, pale canvas, rounded white cards, restrained borders, and dark green home hero. Shared mobile components provide consistent headings, buttons, fields, badges, empty states, and spacing. The apps have separate Android and iOS identities and use the same role-scoped backend API.
+
+**Retailer:** sign in and registration; home overview; medicine catalog and product/batch details; basket, server quote and checkout; order list and detail; alerts; account and business profile; finance and payment history; transaction records; saved order statement; return request and status; and help/FAQ. The saved statement reproduces order, party, batch, and GST snapshots for reference. It is explicitly a transaction record, not a statutory GST invoice.
+
+**Delivery:** sign in and registration; home overview; assigned deliveries; order detail and timeline; one-time location sharing; recipient name and signature capture; delivery confirmation; offline collection recording; alerts; account history; and help/FAQ.
+
+The help screens answer common usage questions and navigate to relevant app areas. There is no support ticket service or messaging workflow. Native Android source in `mobile/app/` and old evaluation APKs in `mobile/dist/` are retained for comparison and are not the new iOS/Android builds. `mobile/tools/` contains packaging and QA utilities; see `mobile/README.md` for project and build instructions.
 
 ## Data platform and hosting
 
@@ -239,7 +258,8 @@ SupplyLink currently:
 - does not create a statutory GST invoice or submit tax returns;
 - does not verify GSTIN or drug-licence details against government registries;
 - does not provide password reset or account recovery;
-- does not manage returns, refunds, recalls, or credit notes;
+- manages return requests and review decisions, but does not process physical returns, refunds, recalls, or credit notes;
+- provides saved order transaction records but no statutory GST invoice;
 - does not provide continuous background location tracking;
 - does not cover prescription validation, controlled-drug rules, or cold-chain monitoring;
 - uses sample medicine, price, tax, and batch data for demonstration unless replaced with validated business data.
@@ -261,11 +281,11 @@ These capabilities must not be implied to customers until separately implemented
 Priorities should be agreed with the client before implementation.
 
 1. Official GST invoices, e-invoicing, credit notes, and tax exports.
-2. Returns, refunds, product recalls, and damaged-stock workflows.
+2. Physical returns, refunds, product recalls, and damaged-stock workflows after return review.
 3. Password reset, email verification, and optional multi-factor authentication.
 4. Online payment collection and payment-gateway reconciliation.
 5. Email, SMS, or WhatsApp notifications.
-6. Proof of delivery using signature or photo.
+6. Photo proof, signature verification, and retention policy for saved mobile signatures.
 7. Live delivery map where legally and operationally appropriate.
 8. Bulk medicine and batch import from CSV.
 9. Hindi and regional-language support.
@@ -280,7 +300,7 @@ Priorities should be agreed with the client before implementation.
 - Required languages.
 - Required integrations with accounting, ERP, government, SMS, email, or WhatsApp systems.
 - Required retention, backup, recovery, audit, and regulatory policies.
-- Whether continuous location tracking or proof of delivery is required.
+- Whether continuous location tracking or photo proof is required beyond the mobile signature workflow.
 
 ## Release acceptance
 

@@ -1,9 +1,8 @@
 import { useRouter } from 'expo-router';
-import { Bell, CreditCard, LayoutGrid, Pill, RefreshCw } from 'lucide-react-native';
+import { Bell, CreditCard, FileText, LayoutGrid, Pill, RefreshCw } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 import { OrderCard } from '@/components/orders';
 import { Button, Card, colors, EmptyState, Muted, Screen, SectionLabel } from '@/components/ui';
-import { APP } from '@/lib/config';
 import { isActive, money } from '@/lib/rules';
 import { useSession } from '@/session/SessionProvider';
 
@@ -18,8 +17,11 @@ export default function HomeScreen() {
 
   return (
     <Screen title="Home" subtitle={user?.business ?? user?.name} onRefresh={refresh}>
-      <Text className="mt-2 text-2xl font-bold text-ink">Hello, {user?.name.split(' ')[0]}</Text>
-      <Muted className="text-[15px]">{APP.greeting}</Muted>
+      <View className="mt-2 rounded-card bg-brand px-5 py-6">
+        <Text className="text-xs font-bold uppercase tracking-widest text-brand-accent">A clearer view. A better day.</Text>
+        <Text className="mt-3 text-[25px] font-semibold leading-8 text-white">Your pharmacy restock starts here.</Text>
+        <Text className="mt-2 text-sm leading-5 text-brand-mist">Bring medicines, orders and fulfilment into one connected workspace.</Text>
+      </View>
 
       <Card>
         <View className="flex-row items-center">
@@ -41,6 +43,8 @@ export default function HomeScreen() {
       </Card>
 
       <Button title="Browse medicines" icon={Pill} onPress={() => router.navigate('/medicines')} />
+      <Button title="Credit & payments" icon={CreditCard} variant="secondary" onPress={() => router.push('/finance')} />
+      <Button title="Order records & returns" icon={FileText} variant="secondary" onPress={() => router.push('/records')} />
       <Button title="Refresh workspace" icon={RefreshCw} variant="secondary" onPress={refresh} />
       <Button
         title={unread > 0 ? `Notifications (${unread} new)` : 'Notifications'}

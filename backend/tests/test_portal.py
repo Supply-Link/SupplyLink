@@ -101,6 +101,45 @@ class PortalTests(unittest.TestCase):
             self.assertGreater(len(data['audit']),4)
         self.assertTrue(state['notifications'])
         self.assertFalse(any('password' in u for u in self.admin.state()['users']))
+
+    def test_signed_delivery_proof_is_atomic_and_role_bound(self):
+        _, order = self.place()
+        for status in ('confirmed', 'packed'):
+            self.assertEqual(self.transition(self.distributor, order, status)[0], 200)
+        self.assertEqual(self.transition(self.distributor, order, 'out_for_delivery', driver_id='delivery')[0], 200)
+        body = dict(order_id=order['id'], recipient_name='Ravi Kumar',
+                    signature=[[[100, 200], [200, 300], [300, 250], [400, 280]]])
+        self.assertEqual(self.retailer.request('/api/proof-of-delivery', body, 'proof-key-one')[0], 403)
+        self.assertEqual(self.driver.request('/api/proof-of-delivery', {**body, 'signature': [[[1, 2]]]}, 'proof-key-one')[0], 400)
+        code, proof = self.driver.request('/api/proof-of-delivery', body, 'proof-key-one')
+        self.assertEqual(code, 200)
+        self.assertEqual(proof['recipient_name'], 'Ravi Kumar')
+        self.assertEqual(self.driver.request('/api/proof-of-delivery', body, 'proof-key-one')[1], proof)
+        self.assertEqual(self.driver.request('/api/proof-of-delivery', body, 'other-proof-key')[0], 409)
+        saved = self.retailer.state()['orders'][0]
+        self.assertEqual(saved['status'], 'delivered')
+        self.assertEqual(saved['proof_of_delivery']['signature'], body['signature'])
+        with Store(self.path).transaction() as data:
+            self.assertEqual(data['orders'][0]['proof_of_delivery'], proof)
+
+    def test_return_request_and_review_keep_stock_and_payment_intact(self):
+        _, order = self.place()
+        self.deliver(order)
+        body = dict(order_id=order['id'], action='request', reason='Damaged outer pack')
+        self.assertEqual(self.retailer.request('/api/returns', body, 'return-key-1')[0], 200)
+        self.assertEqual(self.retailer.request('/api/returns', body, 'return-key-1')[1]['status'], 'requested')
+        self.assertEqual(self.retailer.request('/api/returns', body, 'return-key-2')[0], 409)
+        self.assertEqual(self.driver.request('/api/returns', {**body, 'action': 'approve', 'review_note': 'OK'})[0], 403)
+        self.assertEqual(self.retailer.request('/api/returns', {**body, 'action': 'approve', 'review_note': 'OK'})[0], 403)
+        code, result = self.distributor.request('/api/returns', dict(order_id=order['id'], action='approve', review_note='Bring the pack to the depot'))
+        self.assertEqual(code, 200)
+        self.assertEqual(result['status'], 'approved')
+        self.assertEqual(self.distributor.request('/api/returns', dict(order_id=order['id'], action='reject', review_note='No'))[0], 409)
+        state = self.retailer.state()
+        self.assertEqual(state['orders'][0]['return_request']['status'], 'approved')
+        self.assertEqual(state['orders'][0]['payment_status'], 'unpaid')
+        self.assertEqual(state['user']['credit_used'], order['total'])
+        self.assertEqual(state['products'][0]['stock'], 170)
     def test_role_permissions_and_record_isolation(self):
         _,order=self.place()
         other=Client(self.base).login('retailer2')
