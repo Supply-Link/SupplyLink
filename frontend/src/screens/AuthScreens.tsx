@@ -47,12 +47,11 @@ function AuthStory() {
 }
 
 export function Login() {
-  const { user, license, booting, login } = useAuth()
+  const { user, license, login } = useAuth()
   const [serverError, setServerError] = useState('')
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
   })
-  if (booting) return <PageSkeleton />
   if (user) return <Navigate to="/" replace />
   const submit = handleSubmit(async (values) => {
     setServerError('')

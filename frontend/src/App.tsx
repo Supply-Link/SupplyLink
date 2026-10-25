@@ -4,15 +4,13 @@ import { AppShell } from './components/layout'
 import { PageSkeleton } from './components/ui'
 import type { Role } from './api/types'
 import { useAuth } from './providers/AppProviders'
+import { Login, Register, LicenseLock } from './screens/AuthScreens'
 
 const lazyScreen = <T extends Record<string, unknown>, K extends keyof T>(
   loader: () => Promise<T>,
   name: K,
 ) => lazy(() => loader().then((module) => ({ default: module[name] as ComponentType })))
 
-const Login = lazyScreen(() => import('./screens/AuthScreens'), 'Login')
-const Register = lazyScreen(() => import('./screens/AuthScreens'), 'Register')
-const LicenseLock = lazyScreen(() => import('./screens/AuthScreens'), 'LicenseLock')
 const Dashboard = lazyScreen(() => import('./screens/CoreScreens'), 'Dashboard')
 const Catalog = lazyScreen(() => import('./screens/CoreScreens'), 'Catalog')
 const Orders = lazyScreen(() => import('./screens/CoreScreens'), 'Orders')

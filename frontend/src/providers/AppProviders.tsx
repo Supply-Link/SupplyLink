@@ -1,6 +1,6 @@
 /* oxlint-disable react/only-export-components */
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../state/actions'
 import { clearApiSession, configureApi } from '../api/client'
 import type { AuthResponse, LicenseStatus, User } from '../api/types'
@@ -28,6 +28,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
   const user = useAppSelector((state) => state.portal.user)
   const license = useAppSelector((state) => state.portal.license)
   const [booting, setBooting] = useState(true)
+  const bootstrap = useRef<Promise<void> | null>(null)
 
   const applyLicense = useCallback((status: LicenseStatus) => {
     dispatch(setLicenseAction(status))
@@ -48,7 +49,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     configureApi({ licenseBlocked: applyLicense, unauthorized: reset })
-    void (async () => {
+    bootstrap.current = (async () => {
       try {
         const status = await api.license()
         applyLicense(status)
@@ -57,6 +58,8 @@ function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           reset()
         }
+      } catch {
+        applyLicense({ usable: false, status: 'unavailable', expires_on: null, expires_at: null })
       } finally {
         setBooting(false)
       }
@@ -95,6 +98,8 @@ function AuthProvider({ children }: { children: ReactNode }) {
       applyAuth,
       setLicense: applyLicense,
       login: async (email, password) => {
+        // Finish restoring the old session before applying a new sign-in.
+        await bootstrap.current
         const response = await api.login({ email, password })
         applyAuth(response)
         queryClient.clear()
