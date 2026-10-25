@@ -14,8 +14,9 @@ def same_origin(request):
         parsed = urlsplit(origin)
         require(parsed.scheme in ('http', 'https') and parsed.netloc and parsed.path in ('', '/') and
                 not parsed.username and not parsed.password, 'Cross-origin request rejected.', 403)
-        if origin.rstrip('/') not in allowed_origins():
-            require(parsed.netloc == request.headers.get('host'), 'Cross-origin request rejected.', 403)
+        if origin.rstrip('/') in allowed_origins():
+            return
+        require(parsed.netloc == request.headers.get('host'), 'Cross-origin request rejected.', 403)
     require(request.headers.get('sec-fetch-site') != 'cross-site', 'Cross-site request rejected.', 403)
 
 
