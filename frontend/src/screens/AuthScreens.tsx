@@ -8,7 +8,7 @@ import { api } from '../state/actions'
 import type { Role } from '../api/types'
 import { ROLE_NAMES, STATE_NAMES } from '../lib/constants'
 import { useAuth } from '../providers/AppProviders'
-import { Button, PageSkeleton } from '../components/ui'
+import { Button } from '../components/ui'
 
 const loginSchema = z.object({
   email: z.email('Enter a valid email address.'),
@@ -105,7 +105,6 @@ export function Register() {
     resolver: zodResolver(registerSchema),
     defaultValues: { role: 'retailer', state_code: '29', gstin: '', drug_license: '' },
   })
-  if (booting) return <PageSkeleton />
   if (user) return <Navigate to="/" replace />
   if (license?.usable === false) return <Navigate to="/login" replace />
   const submit = handleSubmit(async (values) => {
@@ -140,7 +139,7 @@ export function Register() {
             <label>GSTIN (optional)<input {...register('gstin')} /></label>
             <label>Drug licence (optional)<input {...register('drug_license')} /></label>
             <div className="full notice">Registration does not grant access automatically. Your password works after approval.</div>
-            <Button className="full" type="submit" disabled={isSubmitting}>Submit access request <ArrowRight /></Button>
+            <Button className="full" type="submit" disabled={booting || isSubmitting}>Submit access request <ArrowRight /></Button>
             {(serverError || Object.keys(errors).length > 0) && <p className="full form-error">{serverError || 'Review the highlighted fields.'}</p>}
           </form>
           <p className="register-link">Already registered? <Link to="/login">Return to sign in</Link></p>

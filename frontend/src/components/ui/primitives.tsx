@@ -115,15 +115,6 @@ export function Loading({ label = 'Loading workspace…' }: { label?: string }) 
   return <main className="loading"><Spinner /><p>{label}</p></main>
 }
 
-export function PageSkeleton() {
-  return <main className="page-skeleton" aria-label="Loading page" aria-busy="true">
-    <div className="skeleton-line skeleton-eyebrow" /><div className="skeleton-line skeleton-title" />
-    <div className="skeleton-hero" />
-    <div className="skeleton-grid">{[0, 1, 2].map((item) => <div className="skeleton-card" key={item}><div className="skeleton-line" /><div className="skeleton-line skeleton-short" /><div className="skeleton-line skeleton-tiny" /></div>)}</div>
-    <div className="skeleton-panel"><div className="skeleton-line skeleton-title" /><div className="skeleton-line" /><div className="skeleton-line" /><div className="skeleton-line skeleton-short" /></div>
-  </main>
-}
-
 export function Avatar({ name, title }: { name: string; title?: string }) {
   return <span className="avatar" title={title}>{name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span>
 }

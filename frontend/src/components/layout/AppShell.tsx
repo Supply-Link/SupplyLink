@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import {
   Activity, Bell, Boxes, Building2, ClipboardList, CreditCard, LayoutDashboard, LogOut,
   Menu, PackageCheck, Settings2, ShieldCheck, ShoppingBasket, Truck, Users, WalletCards,
@@ -9,7 +9,8 @@ import { useAppSelector } from '../../state/store'
 import type { Role } from '../../api/types'
 import { ROLE_NAMES } from '../../lib/constants'
 import { useAuth } from '../../providers/AppProviders'
-import { Avatar, IconButton, PageSkeleton } from '../ui'
+import { Avatar, IconButton, Button } from '../ui'
+import { WorkspaceSkeleton } from './WorkspaceSkeleton'
 
 const nav = [
   { to: '/', label: 'Overview', icon: LayoutDashboard, roles: ['admin', 'distributor', 'retailer', 'delivery'] },
@@ -34,32 +35,33 @@ const todayLabel = new Date().toLocaleDateString('en-IN', {
   year: 'numeric',
 })
 
-export function AppShell() {
+export function AppShell({ pending = false }: { pending?: boolean }) {
   const { user, license, logout } = useAuth()
   const data = useAppSelector((state) => state.portal.workspace)
   const status = useAppSelector((state) => state.portal.workspaceStatus)
   const error = useAppSelector((state) => state.portal.error)
-  useEffect(() => { if (user && license?.usable && status === 'idle') void api.state() }, [user, license?.usable, status])
-  if (!data && status !== 'error') return <PageSkeleton />
-  if (error || !data || !user) throw new Error(error ?? 'Workspace data is unavailable.')
-  const unread = data.notifications.filter((item) => !item.read).length
+  useEffect(() => { if (!pending && user && license?.usable && status === 'idle') void api.state().catch(() => undefined) }, [pending, user, license?.usable, status])
+  const unread = data?.notifications.filter((item) => !item.read).length ?? 0
   return <div className="shell">
     <aside className="sidebar" id="sidebar">
       <div className="brand"><span><PackageCheck /></span>SupplyLink</div>
-      <div className="workspace-label">{ROLE_NAMES[user.role]} workspace</div>
-      <nav>{nav.filter((item) => item.roles.includes(user.role)).map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/'}><item.icon /> {item.label}</NavLink>)}</nav>
+      <div className="workspace-label">{user ? ROLE_NAMES[user.role] : 'SupplyLink'} workspace</div>
+      <nav>{nav.filter((item) => user ? item.roles.includes(user.role) : item.to === '/').map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/'}><item.icon /> {item.label}</NavLink>)}</nav>
       <div className="sidebar-footer">
         <div className="local-note"><b><i />Local workspace</b>Changes saved to your data file.<br />INR · Manual payments</div>
-        <div className="profile"><Avatar name={user.name} /><div><strong>{user.name}</strong><small>{ROLE_NAMES[user.role]}</small></div><IconButton label="Sign out" onClick={() => void logout()}><LogOut /></IconButton></div>
+        {user && <div className="profile"><Avatar name={user.name} /><div><strong>{user.name}</strong><small>{ROLE_NAMES[user.role]}</small></div><IconButton label="Sign out" onClick={() => void logout()}><LogOut /></IconButton></div>}
       </div>
     </aside>
     <main className="main">
       <header className="topbar">
         <IconButton label="Open navigation" className="mobile-menu" onClick={() => document.querySelector('.sidebar')?.classList.toggle('open')}><Menu /></IconButton>
         <div><span>Workspace</span><b> / SupplyLink</b></div>
-        <div className="top-actions"><span>{todayLabel}</span><NavLink to="/notifications" className="notification-button" aria-label={`${unread} unread notifications`}><Bell />{unread > 0 && <b>{unread}</b>}</NavLink><Avatar name={user.business} title={user.business} /></div>
+        <div className="top-actions"><span>{todayLabel}</span><NavLink to="/notifications" className="notification-button" aria-label={data ? `${unread} unread notifications` : 'Notifications'}><Bell />{unread > 0 && <b>{unread}</b>}</NavLink>{user && <Avatar name={user.business} title={user.business} />}</div>
       </header>
-      <div className="content"><Outlet context={data} /><footer>SupplyLink · Pharma distribution, connected.<span>All amounts in INR</span></footer></div>
+      <div className="content">
+        {pending || (!data && status !== 'error') ? <WorkspaceSkeleton /> : !data ? <section className="card inset" role="alert"><h2>Workspace unavailable</h2><p>{error ?? 'Unable to load workspace data.'}</p><Button onClick={() => void api.state().catch(() => undefined)}>Try again</Button></section> : <Suspense fallback={<WorkspaceSkeleton />}><Outlet context={data} /></Suspense>}
+        <footer>SupplyLink · Pharma distribution, connected.<span>All amounts in INR</span></footer>
+      </div>
     </main>
   </div>
 }

@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Archive, Clock, Package, Plus, ShieldAlert } from 'lucide-react'
 import { type FormEvent, useRef, useState } from 'react'
-import * as XLSX from 'xlsx'
 import { useOutletContext } from 'react-router-dom'
 import { api } from '../state/actions'
 import type { AppState, Batch, Product, ProductInput } from '../api/types'
@@ -65,6 +64,7 @@ function ProductForm({
     const errors: string[] = []
 
     try {
+      const XLSX = await import('xlsx')
       const buffer = await file.arrayBuffer()
       const workbook = XLSX.read(buffer, { type: 'array' })
       const sheet = workbook.Sheets[workbook.SheetNames[0]]
