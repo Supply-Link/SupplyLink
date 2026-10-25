@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from '@/navigation/router';
 import { FileText } from 'lucide-react-native';
 import { Text } from 'react-native';
 import { Totals } from '@/components/orders';

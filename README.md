@@ -6,7 +6,7 @@ A professional pharmaceutical distribution portal for administrators, distributo
 
 - `frontend/` — React and Vite web portal
 - `backend/` — FastAPI, application services, LDAP, PostgreSQL persistence, tests, and licence tooling
-- `mobile/` — Expo/React Native retailer and delivery apps, plus the earlier native Android project
+- `mobile/` — bare React Native retailer and delivery apps using Metro, plus the earlier native Android project
 - `docs/` — shared product documentation
 
 ## Start
@@ -234,7 +234,7 @@ The full test suite also covers signature tampering, wrong keys, unsafe permissi
 
 ## Cross-platform mobile apps
 
-The primary mobile workspaces are [`mobile/retailer/`](mobile/retailer/) and [`mobile/delivery/`](mobile/delivery/). Both use Expo, React Native, Expo Router, TypeScript, and NativeWind/Tailwind styles. They implement the retailer and delivery workflows below for Android and iOS. See [`mobile/README.md`](mobile/README.md) for development, checks, and EAS build commands. The existing native Java project and its evaluation APKs are retained separately.
+The primary mobile workspaces are [`mobile/retailer/`](mobile/retailer/) and [`mobile/delivery/`](mobile/delivery/). Both use bare React Native, the React Native Community CLI, Metro, React Navigation, TypeScript, and NativeWind/Tailwind styles. They implement the retailer and delivery workflows below for Android. See [`mobile/README.md`](mobile/README.md) for development, checks, and APK build commands. The existing native Java project and its evaluation APKs are retained separately.
 
 ## Earlier native Android apps
 

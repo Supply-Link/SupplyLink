@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from '@/navigation/router';
 import { Package, Plus } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 import { Body, Button, Card, colors, EmptyState, Muted, Row, Screen, SectionLabel, Title } from '@/components/ui';

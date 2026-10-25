@@ -17,9 +17,6 @@ backend/config/license-public.pem
 mobile/.gradle/
 mobile/.npm-cache/
 mobile/*/node_modules/
-mobile/*/.expo/
-mobile/*/.expo-export-*/
-mobile/.expo-cli-home/
 mobile/local.properties
 mobile/**/build/
 mobile/*.jks

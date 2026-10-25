@@ -1,11 +1,12 @@
 {
-  "extends": "expo/tsconfig.base",
+  "extends": "@react-native/typescript-config",
   "compilerOptions": {
     "strict": true,
     "types": ["jest"],
+    "allowJs": true,
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts", "declarations.d.ts"]
+  "include": ["**/*.ts", "**/*.tsx", "nativewind-env.d.ts", "declarations.d.ts"]
 }

@@ -1,10 +1,7 @@
-// https://docs.expo.dev/guides/using-eslint/
-const { defineConfig } = require('eslint/config');
-const expoConfig = require("eslint-config-expo/flat");
+const tseslint = require('typescript-eslint');
 
-module.exports = defineConfig([
-  expoConfig,
-  {
-    ignores: ["dist/*"],
-  }
-]);
+module.exports = tseslint.config(
+  { ignores: ['android/**', 'ios/**', 'node_modules/**', 'dist/**'] },
+  ...tseslint.configs.recommended,
+  { rules: { '@typescript-eslint/no-explicit-any': 'off' } },
+);

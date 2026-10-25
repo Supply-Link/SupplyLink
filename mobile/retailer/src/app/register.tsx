@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/navigation/router';
 import { Send } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert } from 'react-native';

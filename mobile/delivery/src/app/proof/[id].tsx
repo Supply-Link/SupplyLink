@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from '@/navigation/router';
 import { Eraser, PenLine } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Text, View, type GestureResponderEvent } from 'react-native';

@@ -29,7 +29,7 @@ const Notifications = lazyScreen(() => import('./screens/NotificationsScreen'), 
 
 function Protected({ children, roles }: { children: ReactNode; roles?: Role[] }) {
   const { user, license, booting } = useAuth()
-  if (booting) return <AppShell pending />
+  if (booting) return <main className="auth-check" role="status">Checking your session…</main>
   if (!user) return <Navigate to="/login" replace />
   if (!license?.usable) return <LicenseLock />
   if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />

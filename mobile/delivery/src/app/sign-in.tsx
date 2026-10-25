@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/navigation/router';
 import { LogIn, UserPlus } from 'lucide-react-native';
 import { useState } from 'react';
 import { Button, Card, Field, Muted, Screen, Title } from '@/components/ui';

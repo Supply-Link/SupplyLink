@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/navigation/router';
 import { Bell, CheckCheck } from 'lucide-react-native';
 import { NotificationList } from '@/components/notifications';
 import { Button, Screen } from '@/components/ui';

@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/navigation/router';
 import { CircleCheck } from 'lucide-react-native';
 import { Text } from 'react-native';
 import { Totals } from '@/components/orders';

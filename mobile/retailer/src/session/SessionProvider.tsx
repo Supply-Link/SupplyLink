@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Crypto from 'expo-crypto';
 import {
   createContext,
   useCallback,
@@ -95,7 +94,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const usableNow = useCallback(
-    () => licenceUsableRef.current && performance.now() < deadlineRef.current,
+    () => licenceUsableRef.current && Date.now() < deadlineRef.current,
     [],
   );
 
@@ -105,9 +104,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLicence(value);
       licenceUsableRef.current = value.usable === true;
       const remaining = value.usable ? licenceRemainingMs(value.server_time, value.expires_at) : 0;
-      deadlineRef.current = performance.now() + remaining;
+      deadlineRef.current = Date.now() + remaining;
       const watch = () => {
-        const left = deadlineRef.current - performance.now();
+        const left = deadlineRef.current - Date.now();
         if (left > 0) expiryTimer.current = setTimeout(watch, Math.min(left, MAX_TIMER_MS));
         else {
           setLicenceOk(false);
@@ -265,7 +264,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const keyFor = useCallback((scope: string) => {
     let key = keys.current.get(scope);
     if (!key) {
-      key = Crypto.randomUUID();
+      key = `sl-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
       keys.current.set(scope, key);
     }
     return key;

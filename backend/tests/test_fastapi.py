@@ -75,7 +75,7 @@ class FastAPIContractTests(unittest.TestCase):
         headers = {'X-CSRF-Token': csrf}
         self.assertEqual(self.client.post('/api/quote', content='[]', headers={**headers, 'Content-Type': 'application/json'}).status_code, 400)
         self.assertEqual(self.client.post('/api/quote', json={}, headers={**headers, 'Origin': 'https://evil.example'}).status_code, 403)
-        self.assertEqual(self.client.post('/api/logout', json={}, headers=headers).status_code, 200)
+        self.assertEqual(self.client.post('/api/logout', json={}, headers={'X-CSRF-Token': 'stale-token'}).status_code, 200)
         self.assertEqual(self.client.get('/api/me').status_code, 401)
 
     def test_expired_license_blocks_data_but_allows_sign_in_and_out(self):

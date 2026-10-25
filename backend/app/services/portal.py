@@ -99,11 +99,13 @@ class PortalService:
                     result['_session_token'] = token
             else:
                 session, user = self._session(data, token)
-                require(secrets.compare_digest(csrf, session['csrf']), 'Invalid session token. Refresh and try again.', 403)
                 if path == '/api/logout':
+                    # Logout only destroys the caller's own cookie session. Requiring
+                    # CSRF here can leave a stale cookie behind after token refreshes.
                     data['sessions'].remove(session)
                     result = dict(ok=True, _clear_cookie=True)
                 else:
+                    require(secrets.compare_digest(csrf, session['csrf']), 'Invalid session token. Refresh and try again.', 403)
                     self.require_license()
                     result = self.operations.mutate(data, user, path, body, key)
             if path not in ('/api/login', '/api/logout'):

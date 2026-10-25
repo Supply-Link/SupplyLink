@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/navigation/router';
 import { Cross, PackageSearch, Plus, Search } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';

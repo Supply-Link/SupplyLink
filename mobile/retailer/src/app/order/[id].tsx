@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from '@/navigation/router';
 import { CircleX, FileText, MapPin, Package, RefreshCw, RotateCcw } from 'lucide-react-native';
 import { Alert, Text, View } from 'react-native';
 import { StageBadge, Timeline, Totals } from '@/components/orders';

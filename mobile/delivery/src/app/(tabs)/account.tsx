@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter } from '@/navigation/router';
 import { Banknote, CircleHelp, LogOut, RefreshCw } from 'lucide-react-native';
 import { Text } from 'react-native';
 import { Button, Card, EmptyState, Muted, Screen, SectionLabel, Title } from '@/components/ui';
