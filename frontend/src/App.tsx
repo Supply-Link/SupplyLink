@@ -1,28 +1,31 @@
 import { Component, lazy, type ComponentType, type ErrorInfo, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout'
-import type { Role } from './api/types'
+import { PageDataBoundary } from './components/layout/PageDataBoundary'
+import type { Role } from './types'
 import { useAuth } from './providers/AppProviders'
-import { Login, Register, LicenseLock } from './screens/AuthScreens'
+import { Login } from './screens/LoginScreen'
+import { Register } from './screens/RegisterScreen'
+import { LicenseLock } from './screens/LicenseLockScreen'
 
 const lazyScreen = <T extends Record<string, unknown>, K extends keyof T>(
   loader: () => Promise<T>,
   name: K,
 ) => lazy(() => loader().then((module) => ({ default: module[name] as ComponentType })))
 
-const Dashboard = lazyScreen(() => import('./screens/CoreScreens'), 'Dashboard')
-const Catalog = lazyScreen(() => import('./screens/CoreScreens'), 'Catalog')
-const Orders = lazyScreen(() => import('./screens/CoreScreens'), 'Orders')
-const Deliveries = lazyScreen(() => import('./screens/CoreScreens'), 'Deliveries')
-const Payments = lazyScreen(() => import('./screens/CoreScreens'), 'Payments')
-const Credit = lazyScreen(() => import('./screens/CoreScreens'), 'Credit')
+const Dashboard = lazyScreen(() => import('./screens/DashboardScreen'), 'Dashboard')
+const Catalog = lazyScreen(() => import('./screens/CatalogScreen'), 'Catalog')
+const Orders = lazyScreen(() => import('./screens/OrdersScreen'), 'Orders')
+const Deliveries = lazyScreen(() => import('./screens/DeliveriesScreen'), 'Deliveries')
+const Payments = lazyScreen(() => import('./screens/PaymentsScreen'), 'Payments')
+const Credit = lazyScreen(() => import('./screens/CreditScreen'), 'Credit')
 const Inventory = lazyScreen(() => import('./screens/InventoryScreen'), 'Inventory')
-const People = lazyScreen(() => import('./screens/AdminScreens'), 'People')
-const Pricing = lazyScreen(() => import('./screens/AdminScreens'), 'Pricing')
-const Activity = lazyScreen(() => import('./screens/AdminScreens'), 'Activity')
-const Business = lazyScreen(() => import('./screens/AdminScreens'), 'Business')
-const Directory = lazyScreen(() => import('./screens/AdminScreens'), 'Directory')
-const Notifications = lazyScreen(() => import('./screens/AdminScreens'), 'Notifications')
+const People = lazyScreen(() => import('./screens/PeopleScreen'), 'People')
+const Pricing = lazyScreen(() => import('./screens/PricingScreen'), 'Pricing')
+const Activity = lazyScreen(() => import('./screens/ActivityScreen'), 'Activity')
+const Business = lazyScreen(() => import('./screens/BusinessScreen'), 'Business')
+const Directory = lazyScreen(() => import('./screens/DirectoryScreen'), 'Directory')
+const Notifications = lazyScreen(() => import('./screens/NotificationsScreen'), 'Notifications')
 
 function Protected({ children, roles }: { children: ReactNode; roles?: Role[] }) {
   const { user, license, booting } = useAuth()
@@ -51,19 +54,19 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/" element={<Protected><AppShell /></Protected>}>
-              <Route index element={<Dashboard />} />
-              <Route path="catalog" element={<Protected roles={['retailer']}><Catalog /></Protected>} />
-              <Route path="orders" element={<Protected roles={['admin', 'distributor', 'retailer']}><Orders /></Protected>} />
-              <Route path="deliveries" element={<Protected roles={['admin', 'distributor', 'delivery']}><Deliveries /></Protected>} />
-              <Route path="payments" element={<Payments />} />
-              <Route path="credit" element={<Protected roles={['admin', 'retailer']}><Credit /></Protected>} />
-              <Route path="inventory" element={<Protected roles={['admin', 'distributor']}><Inventory /></Protected>} />
-              <Route path="people" element={<Protected roles={['admin']}><People /></Protected>} />
-              <Route path="pricing" element={<Protected roles={['admin']}><Pricing /></Protected>} />
-              <Route path="activity" element={<Protected roles={['admin']}><Activity /></Protected>} />
-              <Route path="business" element={<Protected roles={['admin', 'distributor', 'retailer']}><Business /></Protected>} />
-              <Route path="directory" element={<Protected roles={['admin']}><Directory /></Protected>} />
-              <Route path="notifications" element={<Notifications />} />
+              <Route index element={<PageDataBoundary page="dashboard"><Dashboard /></PageDataBoundary>} />
+              <Route path="catalog" element={<Protected roles={['retailer']}><PageDataBoundary page="catalog"><Catalog /></PageDataBoundary></Protected>} />
+              <Route path="orders" element={<Protected roles={['admin', 'distributor', 'retailer']}><PageDataBoundary page="orders"><Orders /></PageDataBoundary></Protected>} />
+              <Route path="deliveries" element={<Protected roles={['admin', 'distributor', 'delivery']}><PageDataBoundary page="deliveries"><Deliveries /></PageDataBoundary></Protected>} />
+              <Route path="payments" element={<PageDataBoundary page="payments"><Payments /></PageDataBoundary>} />
+              <Route path="credit" element={<Protected roles={['admin', 'retailer']}><PageDataBoundary page="credit"><Credit /></PageDataBoundary></Protected>} />
+              <Route path="inventory" element={<Protected roles={['admin', 'distributor']}><PageDataBoundary page="inventory"><Inventory /></PageDataBoundary></Protected>} />
+              <Route path="people" element={<Protected roles={['admin']}><PageDataBoundary page="people"><People /></PageDataBoundary></Protected>} />
+              <Route path="pricing" element={<Protected roles={['admin']}><PageDataBoundary page="pricing"><Pricing /></PageDataBoundary></Protected>} />
+              <Route path="activity" element={<Protected roles={['admin']}><PageDataBoundary page="activity"><Activity /></PageDataBoundary></Protected>} />
+              <Route path="business" element={<Protected roles={['admin', 'distributor', 'retailer']}><PageDataBoundary page="business"><Business /></PageDataBoundary></Protected>} />
+              <Route path="directory" element={<Protected roles={['admin']}><PageDataBoundary page="directory"><Directory /></PageDataBoundary></Protected>} />
+              <Route path="notifications" element={<PageDataBoundary page="notifications"><Notifications /></PageDataBoundary>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

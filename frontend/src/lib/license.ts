@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
-import type { LicenseStatus } from '../api/types'
+import type { LicenseStatus } from '../types'
 
 const isBusinessQuery = (query: { queryKey: readonly unknown[] }) =>
   query.queryKey[0] === 'state' || query.queryKey[0] === 'quote'

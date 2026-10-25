@@ -1,7 +1,7 @@
 """Application ports. Replace LocalOperations with a gRPC adapter after extraction."""
 from typing import Protocol
 
-from app.domain import mutate, register, snapshot
+from app.models.domain import mutate, register, snapshot
 
 
 class BusinessOperations(Protocol):

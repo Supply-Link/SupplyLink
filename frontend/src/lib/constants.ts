@@ -1,4 +1,4 @@
-import type { Role } from '../api/types'
+import type { Role } from '../types'
 
 export const ROLE_NAMES: Record<Role, string> = {
   admin: 'Administrator',

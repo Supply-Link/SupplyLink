@@ -1,4 +1,4 @@
-import type { Order, Payment, Role } from '../api/types'
+import type { Order, Payment, Role } from '../types'
 
 export const money = (paise = 0) =>
   new Intl.NumberFormat('en-IN', {

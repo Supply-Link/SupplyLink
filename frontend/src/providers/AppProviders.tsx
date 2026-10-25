@@ -1,16 +1,17 @@
 /* oxlint-disable react/only-export-components */
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { api } from '../state/actions'
-import { clearApiSession, configureApi } from '../api/client'
-import type { AuthResponse, LicenseStatus, User } from '../api/types'
+import { clearApiSession, configureApi } from '../lib/http'
+import type { AuthResponse, LicenseStatus, Role, User } from '../types'
 import { applyLicenseCachePolicy } from '../lib/license'
 import { ToastVisual } from '../components/ui'
-import { clearSession, setAuth, setLicense as setLicenseAction } from '../state/portalSlice'
+import { clearSession, loadLicense, loadMe, setAuth, setLicense as setLicenseAction, signIn, signOut } from '../state/pages/authSlice'
+import { refreshPages } from '../state/pages/events'
 import { useAppDispatch, useAppSelector } from '../state/store'
 
 interface AuthContextValue {
   user: User | null
+  navigationRole: Role | null
   license: LicenseStatus | null
   booting: boolean
   login: (email: string, password: string) => Promise<void>
@@ -25,8 +26,9 @@ const ToastContext = createContext<(message: string, tone?: 'success' | 'error')
 function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const dispatch = useAppDispatch()
-  const user = useAppSelector((state) => state.portal.user)
-  const license = useAppSelector((state) => state.portal.license)
+  const user = useAppSelector((state) => state.auth.user)
+  const navigationRole = useAppSelector((state) => state.auth.navigationRole)
+  const license = useAppSelector((state) => state.auth.license)
   const [booting, setBooting] = useState(true)
   const bootstrap = useRef<Promise<void> | null>(null)
 
@@ -51,10 +53,10 @@ function AuthProvider({ children }: { children: ReactNode }) {
     configureApi({ licenseBlocked: applyLicense, unauthorized: reset })
     bootstrap.current = (async () => {
       try {
-        const status = await api.license()
+        const status = await dispatch(loadLicense()).unwrap()
         applyLicense(status)
         try {
-          applyAuth(await api.me())
+          applyAuth(await dispatch(loadMe()).unwrap())
         } catch {
           reset()
         }
@@ -64,14 +66,14 @@ function AuthProvider({ children }: { children: ReactNode }) {
         setBooting(false)
       }
     })()
-  }, [applyAuth, applyLicense, reset])
+  }, [applyAuth, applyLicense, dispatch, reset])
 
   useEffect(() => {
     const check = async () => {
       try {
-        const status = await api.license()
+        const status = await dispatch(loadLicense()).unwrap()
         applyLicense(status)
-        if (status.usable) void queryClient.invalidateQueries({ queryKey: ['state'] })
+        if (status.usable) dispatch(refreshPages())
       } catch {
         applyLicense({ usable: false, status: 'unavailable', expires_on: null, expires_at: null })
       }
@@ -88,11 +90,12 @@ function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [applyLicense, queryClient])
+  }, [applyLicense, dispatch])
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
+      navigationRole,
       license,
       booting,
       applyAuth,
@@ -100,19 +103,19 @@ function AuthProvider({ children }: { children: ReactNode }) {
       login: async (email, password) => {
         // Finish restoring the old session before applying a new sign-in.
         await bootstrap.current
-        const response = await api.login({ email, password })
+        const response = await dispatch(signIn({ email, password })).unwrap()
         applyAuth(response)
         queryClient.clear()
       },
       logout: async () => {
         try {
-          await api.logout()
+          await dispatch(signOut()).unwrap()
         } finally {
           reset()
         }
       },
     }),
-    [applyAuth, applyLicense, booting, license, queryClient, reset, user],
+    [applyAuth, applyLicense, booting, dispatch, license, navigationRole, queryClient, reset, user],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

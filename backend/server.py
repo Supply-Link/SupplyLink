@@ -7,11 +7,11 @@ import threading
 from pathlib import Path
 
 import uvicorn
-from app.controllers.http import create_app
+from app.main import create_app
 from app.ldap_server import LDAPServer
 from app.licensing import DEFAULT_LICENSE, DEFAULT_PUBLIC_KEY, LicenseStore
 from app.services.portal import PortalService
-from app.store import Store
+from app.models.store import Store
 
 try:
     from dotenv import load_dotenv

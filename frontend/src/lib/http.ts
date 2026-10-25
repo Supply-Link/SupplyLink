@@ -1,4 +1,4 @@
-import type { ApiProblem, LicenseStatus } from './types'
+import type { ApiProblem, LicenseStatus } from '../types'
 
 export class ApiError extends Error {
   readonly status: number

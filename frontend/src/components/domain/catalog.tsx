@@ -1,6 +1,6 @@
 import { ArrowRight, Package, Plus } from 'lucide-react'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
-import type { Batch, Product, Role } from '../../api/types'
+import type { Batch, Product, Role } from '../../types'
 import { ROLE_NAMES, STATE_NAMES } from '../../lib/constants'
 import { money } from '../../lib/helpers'
 import {

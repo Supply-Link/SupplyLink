@@ -5,7 +5,7 @@ import threading
 import time
 
 from app.directory import authenticate, enabled
-from app.domain import Problem, require, safe_user
+from app.models.domain import Problem, require, safe_user
 from app.ports import LocalOperations
 
 
@@ -59,6 +59,16 @@ class PortalService:
             result = self.operations.snapshot(data, user)
             result['directory'].update(listener_enabled=bool(self.ldap_url), url=self.ldap_url)
             return result
+
+    def page(self, token, page):
+        from app.models.pages import PAGE_ROLES
+        from app.models.page_data import page_data
+        with self.store.transaction() as data:
+            _, user = self._session(data, token)
+            self.require_license()
+            require(page in PAGE_ROLES, 'Page not found.', 404)
+            require(user['role'] in PAGE_ROLES[page], 'Your role cannot access this page.', 403)
+            return page_data(data, user, page, self.ldap_url)
 
     def _rate_limit(self, ip):
         with self.attempt_lock:

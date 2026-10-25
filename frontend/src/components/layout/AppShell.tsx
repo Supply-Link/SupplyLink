@@ -4,12 +4,12 @@ import {
   Menu, PackageCheck, Settings2, ShieldCheck, ShoppingBasket, Truck, Users, WalletCards,
 } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { api } from '../../state/actions'
-import { useAppSelector } from '../../state/store'
-import type { Role } from '../../api/types'
+import { loadShell } from '../../state/pages/shellSlice'
+import { useAppDispatch, useAppSelector } from '../../state/store'
+import type { Role } from '../../types'
 import { ROLE_NAMES } from '../../lib/constants'
 import { useAuth } from '../../providers/AppProviders'
-import { Avatar, IconButton, Button } from '../ui'
+import { Avatar, IconButton } from '../ui'
 import { WorkspaceSkeleton } from './WorkspaceSkeleton'
 
 const nav = [
@@ -36,17 +36,17 @@ const todayLabel = new Date().toLocaleDateString('en-IN', {
 })
 
 export function AppShell({ pending = false }: { pending?: boolean }) {
-  const { user, license, logout } = useAuth()
-  const data = useAppSelector((state) => state.portal.workspace)
-  const status = useAppSelector((state) => state.portal.workspaceStatus)
-  const error = useAppSelector((state) => state.portal.error)
-  useEffect(() => { if (!pending && user && license?.usable && status === 'idle') void api.state().catch(() => undefined) }, [pending, user, license?.usable, status])
-  const unread = data?.notifications.filter((item) => !item.read).length ?? 0
+  const { user, navigationRole, license, logout } = useAuth()
+  const role = user?.role ?? (pending ? navigationRole : null)
+  const dispatch = useAppDispatch()
+  const { data, status } = useAppSelector((state) => state.pages.shell)
+  useEffect(() => { if (!pending && user && license?.usable && status === 'idle') void dispatch(loadShell()) }, [dispatch, pending, user, license?.usable, status])
+  const unread = data && 'unread_notifications' in data ? data.unread_notifications : 0
   return <div className="shell">
     <aside className="sidebar" id="sidebar">
       <div className="brand"><span><PackageCheck /></span>SupplyLink</div>
-      <div className="workspace-label">{user ? ROLE_NAMES[user.role] : 'SupplyLink'} workspace</div>
-      <nav>{nav.filter((item) => user ? item.roles.includes(user.role) : item.to === '/').map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/'}><item.icon /> {item.label}</NavLink>)}</nav>
+      <div className="workspace-label">{role ? ROLE_NAMES[role] : 'SupplyLink'} workspace</div>
+      <nav>{nav.filter((item) => role ? item.roles.includes(role) : item.to === '/').map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/'}><item.icon /> {item.label}</NavLink>)}</nav>
       <div className="sidebar-footer">
         <div className="local-note"><b><i />Local workspace</b>Changes saved to your data file.<br />INR · Manual payments</div>
         {user && <div className="profile"><Avatar name={user.name} /><div><strong>{user.name}</strong><small>{ROLE_NAMES[user.role]}</small></div><IconButton label="Sign out" onClick={() => void logout()}><LogOut /></IconButton></div>}
@@ -59,7 +59,7 @@ export function AppShell({ pending = false }: { pending?: boolean }) {
         <div className="top-actions"><span>{todayLabel}</span><NavLink to="/notifications" className="notification-button" aria-label={data ? `${unread} unread notifications` : 'Notifications'}><Bell />{unread > 0 && <b>{unread}</b>}</NavLink>{user && <Avatar name={user.business} title={user.business} />}</div>
       </header>
       <div className="content">
-        {pending || (!data && status !== 'error') ? <WorkspaceSkeleton /> : !data ? <section className="card inset" role="alert"><h2>Workspace unavailable</h2><p>{error ?? 'Unable to load workspace data.'}</p><Button onClick={() => void api.state().catch(() => undefined)}>Try again</Button></section> : <Suspense fallback={<WorkspaceSkeleton />}><Outlet context={data} /></Suspense>}
+        {pending ? <WorkspaceSkeleton /> : <Suspense fallback={<WorkspaceSkeleton />}><Outlet /></Suspense>}
         <footer>SupplyLink · Pharma distribution, connected.<span>All amounts in INR</span></footer>
       </div>
     </main>

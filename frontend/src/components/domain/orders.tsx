@@ -1,4 +1,4 @@
-import type { Order, Quote, Role } from '../../api/types'
+import type { Order, Quote, Role } from '../../types'
 import { date, money } from '../../lib/helpers'
 import { Button, DataTable, DetailPair, StatusBadge, type DataTableColumn } from '../ui'
 

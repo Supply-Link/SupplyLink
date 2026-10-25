@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, clearApiSession, configureApi, request } from './client'
+import { ApiError, clearApiSession, configureApi, request } from './http'
 
 const jsonResponse = (data: unknown, status = 200) => ({
   ok: status >= 200 && status < 300,

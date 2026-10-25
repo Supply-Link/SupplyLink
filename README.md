@@ -32,7 +32,9 @@ python server.py
 - Base DN: **dc=supplylink,dc=local**
 - Storage: PostgreSQL (`DATABASE_URL`)
 
-`server.py` starts FastAPI through Uvicorn. `backend/app/controllers/` contains the HTTP adapter, `backend/app/services/` the application use cases, and `backend/app/ports.py` the replaceable business operations port. `backend/legacy_server.py` retains the former HTTP adapter for regression tests; it is not the default server. Web and mobile clients keep using the same `/api` paths. The versioned `backend/contracts/supplylink/v1/operations.proto` is a draft internal gRPC boundary for a later component split; this release does not run a gRPC server.
+`server.py` starts FastAPI through Uvicorn. `backend/app/main.py` composes the application; `routes/` defines endpoints, `controllers/` handles HTTP input/output, `services/` owns authentication and transaction boundaries, and `models/` owns business rules, page projections, and persistence. The React application is the view layer. See [backend architecture and page APIs](backend/README.md).
+
+`backend/legacy_server.py` and the deprecated `GET /api/state` remain compatible with regression tests and the existing mobile clients. Web pages use individual role-aware APIs. Existing command URLs and session/CSRF rules are unchanged. The versioned `backend/contracts/supplylink/v1/operations.proto` is a draft internal gRPC boundary; this release does not run a gRPC server.
 
 In a second terminal, start the frontend:
 
@@ -48,7 +50,7 @@ npm run dev
 
 The frontend uses `VITE_API_BASE_URL=/api` and proxies that same-origin path to `API_PROXY_TARGET`. This preserves session-cookie and CSRF protection. Opening port 8000 directly exposes only the JSON API, not the React application. The PostgreSQL URL is backend-only and must never be added to `frontend/.env`.
 
-The web portal uses Redux Toolkit for authentication, licence, workspace, and quote state. `createAsyncThunk` actions in `frontend/src/state/portalSlice.ts` call the HTTP adapter, and route/data loading displays skeleton placeholders. Existing React Query helpers still manage local form pending and quote lifecycles; the authoritative workspace state is Redux.
+The web portal uses Redux Toolkit with an authentication slice and one slice per page under `frontend/src/state/pages/`. Each page slice calls its own API and tracks its own data, pending request, and errors. Saves invalidate dependent page caches; only mounted pages refetch. React Query manages form mutations and cart quotes. Skeletons stay inside the content area while navigation remains visible. See [frontend data flow](frontend/README.md).
 
 Both backend listeners bind to localhost by default; LDAP is always loopback-only. Use `--port 8080 --ldap-port 1390` for alternative backend settings, or `--no-ldap` for the API alone. If a requested port is unavailable, startup fails with an error instead of silently omitting the directory. If the API port changes, update `API_PROXY_TARGET` in `frontend/.env`.
 
