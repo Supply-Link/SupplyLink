@@ -2,7 +2,6 @@ import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/tool
 import { request } from '../../lib/http'
 import type { AuthResponse, LicenseStatus, Role, User } from '../../types'
 
-export const loadLicense = createAsyncThunk('auth/license', (_, { signal }) => request<LicenseStatus>('/api/license', { signal }))
 export const loadMe = createAsyncThunk('auth/me', (_, { signal }) => request<AuthResponse>('/api/me', { signal }))
 export const signIn = createAsyncThunk('auth/login', (body: { email: string; password: string }, { signal }) => request<AuthResponse>('/api/login', { body, signal }))
 export const signOut = createAsyncThunk('auth/logout', (_, { signal }) => request<{ ok: boolean }>('/api/logout', { body: {}, signal }))
@@ -25,7 +24,6 @@ const authSlice = createSlice({
     clearSession(state) { state.user = null; state.navigationRole = null; state.error = null },
   },
   extraReducers: (builder) => {
-    builder.addCase(loadLicense.fulfilled, (state, action) => { state.license = action.payload })
     builder.addCase(loadMe.fulfilled, (state, action) => { state.user = action.payload.user; state.navigationRole = action.payload.user.role; state.license = action.payload.license })
     builder.addCase(signIn.fulfilled, (state, action) => { state.user = action.payload.user; state.navigationRole = action.payload.user.role; state.license = action.payload.license })
     builder.addCase(signOut.fulfilled, (state) => { state.user = null; state.navigationRole = null })

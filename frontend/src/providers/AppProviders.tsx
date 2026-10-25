@@ -5,7 +5,7 @@ import { clearApiSession, configureApi } from '../lib/http'
 import type { AuthResponse, LicenseStatus, Role, User } from '../types'
 import { applyLicenseCachePolicy } from '../lib/license'
 import { ToastVisual } from '../components/ui'
-import { clearSession, loadLicense, loadMe, setAuth, setLicense as setLicenseAction, signIn, signOut } from '../state/pages/authSlice'
+import { clearSession, loadMe, setAuth, setLicense as setLicenseAction, signIn, signOut } from '../state/pages/authSlice'
 import { refreshPages } from '../state/pages/events'
 import { useAppDispatch, useAppSelector } from '../state/store'
 
@@ -53,15 +53,9 @@ function AuthProvider({ children }: { children: ReactNode }) {
     configureApi({ licenseBlocked: applyLicense, unauthorized: reset })
     bootstrap.current = (async () => {
       try {
-        const status = await dispatch(loadLicense()).unwrap()
-        applyLicense(status)
-        try {
-          applyAuth(await dispatch(loadMe()).unwrap())
-        } catch {
-          reset()
-        }
+        applyAuth(await dispatch(loadMe()).unwrap())
       } catch {
-        applyLicense({ usable: false, status: 'unavailable', expires_on: null, expires_at: null })
+        reset()
       } finally {
         setBooting(false)
       }
@@ -69,28 +63,16 @@ function AuthProvider({ children }: { children: ReactNode }) {
   }, [applyAuth, applyLicense, dispatch, reset])
 
   useEffect(() => {
-    const check = async () => {
-      try {
-        const status = await dispatch(loadLicense()).unwrap()
-        applyLicense(status)
-        if (status.usable) dispatch(refreshPages())
-      } catch {
-        applyLicense({ usable: false, status: 'unavailable', expires_on: null, expires_at: null })
-      }
+    const refreshOnResume = () => {
+      if (!document.hidden && user && license?.usable) dispatch(refreshPages())
     }
-    const interval = window.setInterval(() => void check(), 15_000)
-    const onFocus = () => void check()
-    const onVisibility = () => {
-      if (!document.hidden) void check()
-    }
-    window.addEventListener('focus', onFocus)
-    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('focus', refreshOnResume)
+    document.addEventListener('visibilitychange', refreshOnResume)
     return () => {
-      window.clearInterval(interval)
-      window.removeEventListener('focus', onFocus)
-      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', refreshOnResume)
+      document.removeEventListener('visibilitychange', refreshOnResume)
     }
-  }, [applyLicense, dispatch])
+  }, [dispatch, license?.usable, user])
 
   const value = useMemo<AuthContextValue>(
     () => ({

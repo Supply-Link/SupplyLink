@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice, isAnyOf } from '@reduxjs/toolkit'
 import type { PageName, PagePayloads } from './types'
-import { clearSession, setAuth, setLicense, loadLicense, signIn, signOut } from './authSlice'
+import { clearSession, setAuth, setLicense, signIn, signOut } from './authSlice'
 import { invalidatePages, refreshPages } from './events'
 
 export interface PageState {
@@ -39,7 +39,7 @@ export function createPageSlice<P extends PageName>(name: P, fetchPage: (signal?
       })
       // Ignore late responses from a previous session or before a licence lock.
       builder.addMatcher(isAnyOf(clearSession, setAuth, signIn.fulfilled, signOut.fulfilled), () => initialState)
-      builder.addMatcher(isAnyOf(setLicense, loadLicense.fulfilled), (state, action) => action.payload.usable ? state : initialState)
+      builder.addMatcher(isAnyOf(setLicense), (state, action) => action.payload.usable ? state : initialState)
     },
   })
   return { load, reducer: slice.reducer }
