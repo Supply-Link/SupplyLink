@@ -95,7 +95,14 @@ export function Screen({ title, subtitle, onBack, onRefresh, bottomInset, childr
 }
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <View className={`mt-3 rounded-card border border-line bg-white px-4 py-4 ${className}`}>{children}</View>;
+  return (
+    <View
+      className={`mt-3 rounded-2xl bg-white px-4 py-4 ${className}`}
+      style={{ elevation: 2, shadowColor: '#173d34', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4 }}
+    >
+      {children}
+    </View>
+  );
 }
 
 export function Title({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -103,7 +110,7 @@ export function Title({ children, className = '' }: { children: ReactNode; class
 }
 
 export function Body({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <Text className={`mt-1 text-[15px] leading-5 text-ink ${className}`}>{children}</Text>;
+  return <Text className={`mt-1 text-base leading-6 text-ink ${className}`}>{children}</Text>;
 }
 
 export function Muted({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -118,8 +125,8 @@ type Variant = 'primary' | 'secondary' | 'danger';
 
 const buttonStyles: Record<Variant, { box: string; text: string; icon: string }> = {
   primary: { box: 'bg-brand', text: 'text-white', icon: colors.white },
-  secondary: { box: 'border border-line bg-white', text: 'text-brand', icon: colors.brand },
-  danger: { box: 'border border-red-200 bg-white', text: 'text-danger', icon: colors.danger },
+  secondary: { box: 'bg-brand-soft', text: 'text-brand', icon: colors.brand },
+  danger: { box: 'bg-red-50', text: 'text-danger', icon: colors.danger },
 };
 
 interface ButtonProps {
@@ -139,10 +146,10 @@ export function Button({ title, onPress, variant = 'primary', icon: Icon, disabl
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      className={`mt-2.5 h-12 flex-row items-center justify-center rounded-card px-4 active:opacity-80 ${style.box} ${disabled ? 'opacity-50' : ''} ${className}`}
+      className={`mt-2.5 h-12 flex-row items-center justify-center rounded-xl px-4 active:opacity-75 active:scale-[0.98] ${style.box} ${disabled ? 'opacity-50' : ''} ${className}`}
     >
       {Icon ? <Icon size={18} color={style.icon} /> : null}
-      <Text className={`text-[15px] font-semibold ${Icon ? 'ml-2' : ''} ${style.text}`}>{title}</Text>
+      <Text className={`text-base font-semibold ${Icon ? 'ml-2' : ''} ${style.text}`}>{title}</Text>
     </Pressable>
   );
 }
@@ -158,7 +165,7 @@ export function Field({ label, ...props }: TextInputProps & { label: string }) {
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor="#9aa8a0"
-        className="rounded-xl border border-line bg-white px-3 py-2.5 text-base text-ink"
+        className="rounded-xl bg-canvas px-3 py-3 text-base text-ink"
         {...props}
       />
     </View>
