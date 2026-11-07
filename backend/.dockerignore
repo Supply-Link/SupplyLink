@@ -1,0 +1,8 @@
+target/
+.env
+.env.*
+.secrets/
+config/license-public.pem
+.claude/
+.deps/
+*.md
