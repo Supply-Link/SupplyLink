@@ -1,3 +1,6 @@
+// Pure domain helpers — server URL validation, INR currency and GST
+// formatting, order status rules, IST date formatting, and licence expiry math.
+
 import type { OrderStatus } from './types';
 
 const SERVER_PATTERN =

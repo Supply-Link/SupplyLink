@@ -1,3 +1,6 @@
+// Order detail screen — full order view with status badge, line items,
+// GST totals, timeline, proof of delivery, and cancel/return/statement links.
+
 import { useLocalSearchParams, useRouter } from '@/navigation/router';
 import { CircleX, FileText, MapPin, Package, RefreshCw, RotateCcw } from 'lucide-react-native';
 import { Alert, Text, View } from 'react-native';
@@ -86,7 +89,13 @@ export default function OrderScreen() {
         <Timeline history={order.history} />
       </Card>
 
-      {order.proof_of_delivery ? <Card><Title>Proof of delivery</Title><Body>Received by {order.proof_of_delivery.recipient_name}</Body><Muted>{dateTime(order.proof_of_delivery.captured_at)}</Muted></Card> : null}
+      {order.proof_of_delivery ? (
+        <Card>
+          <Title>Proof of delivery</Title>
+          <Body>Received by {order.proof_of_delivery.recipient_name}</Body>
+          <Muted>{dateTime(order.proof_of_delivery.captured_at)}</Muted>
+        </Card>
+      ) : null}
 
       <Button title="View transaction record" icon={FileText} variant="secondary" onPress={() => router.push({ pathname: '/statement/[id]', params: { id: order.id } })} />
       {order.status === 'delivered' ? <Button title={order.return_request ? `Return ${order.return_request.status}` : 'Request a return'} icon={RotateCcw} variant="secondary" onPress={() => router.push({ pathname: '/return/[id]', params: { id: order.id } })} /> : null}

@@ -1,3 +1,6 @@
+// CartProvider — in-memory basket with epoch-based session reset,
+// per-product quantity validation, and checkout state.
+
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import type { Product, Quote } from '@/lib/types';
 import { useSession } from './SessionProvider';

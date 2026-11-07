@@ -1,3 +1,7 @@
+// SessionProvider — server URL persistence, sign-in/out, licence polling
+// with AppState-aware timer, workspace snapshot, request() with CSRF
+// and busy guard, and idempotency key store.
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createContext,

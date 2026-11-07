@@ -1,3 +1,6 @@
+// useRouter hook — maps file-style pathnames to React Navigation route
+// names; push/navigate/back/dismissAll helpers for all delivery screens.
+
 import { StackActions, useNavigation, useRoute } from '@react-navigation/native';
 import type { NavigationProp, ParamListBase, RouteProp } from '@react-navigation/native';
 

@@ -1,3 +1,6 @@
+// TabNavigator — bottom tabs: Home, Deliveries (active-count badge),
+// Alerts (unread badge), and Account.
+
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Bell, House, Truck, UserRound } from 'lucide-react-native';
 import { colors } from '@/components/ui';

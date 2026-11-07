@@ -1,3 +1,6 @@
+// Business details screen — editable legal name, address, GST state,
+// GSTIN, and drug licence; changes apply to future orders.
+
 import { useRouter } from '@/navigation/router';
 import { Save } from 'lucide-react-native';
 import { useState } from 'react';

@@ -1,3 +1,7 @@
+// Design-system primitives shared across all delivery screens: Screen layout
+// wrapper, Card, Button (primary/secondary/danger), Field, Segmented, Select,
+// Dialog, EmptyState, Row, and typography helpers (Title, Body, Muted, SectionLabel).
+
 import { ChevronDown, ChevronLeft, Check, Cross, type LucideIcon } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import {
@@ -15,7 +19,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP } from '@/lib/config';
-import { useSession } from '@/session/SessionProvider';
 
 export const colors = {
   brand: '#173d34',
@@ -38,7 +41,6 @@ interface ScreenProps {
 
 export function Screen({ title, subtitle, onBack, onRefresh, bottomInset, children }: ScreenProps) {
   const insets = useSafeAreaInsets();
-  const { activity } = useSession();
   const [refreshing, setRefreshing] = useState(false);
 
   const pull = onRefresh
@@ -88,7 +90,6 @@ export function Screen({ title, subtitle, onBack, onRefresh, bottomInset, childr
       >
         {children}
       </ScrollView>
-      {activity ? <Text className="bg-canvas px-5 py-1.5 text-xs text-muted">{activity}</Text> : null}
     </KeyboardAvoidingView>
   );
 }

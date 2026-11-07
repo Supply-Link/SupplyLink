@@ -1,8 +1,11 @@
+// Finance screen — credit meter, unpaid credit-order list,
+// and recorded payment history.
+
 import { useRouter } from '@/navigation/router';
 import { Banknote, CreditCard, RefreshCw, ReceiptText } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 import { OrderCard } from '@/components/orders';
-import { Button, Card, EmptyState, Muted, Row, Screen, SectionLabel, Title } from '@/components/ui';
+import { Button, Card, colors, EmptyState, Muted, Row, Screen, SectionLabel, Title } from '@/components/ui';
 import { dateTime, money } from '@/lib/rules';
 import { useSession } from '@/session/SessionProvider';
 
@@ -22,7 +25,7 @@ export default function FinanceScreen() {
     <Screen title="Credit & payments" subtitle="Your purchasing capacity and recorded receipts" onBack={router.back} onRefresh={refresh} bottomInset>
       <Card>
         <View className="flex-row items-center">
-          <CreditCard size={22} color="#173d34" />
+          <CreditCard size={22} color={colors.brand} />
           <Text className="ml-2 text-xs font-bold uppercase tracking-widest text-muted">Available trade credit</Text>
         </View>
         <Text className="mt-3 text-[30px] font-semibold tracking-tight text-brand">{money(available)}</Text>

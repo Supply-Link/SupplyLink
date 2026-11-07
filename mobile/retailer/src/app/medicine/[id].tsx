@@ -1,3 +1,6 @@
+// Medicine detail screen — full product spec, batch list,
+// and add-to-basket action.
+
 import { useLocalSearchParams, useRouter } from '@/navigation/router';
 import { Package, Plus } from 'lucide-react-native';
 import { Text, View } from 'react-native';

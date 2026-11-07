@@ -1,3 +1,5 @@
+// Alerts screen — notification list with mark-all-read action.
+
 import { useRouter } from '@/navigation/router';
 import { Bell, CheckCheck } from 'lucide-react-native';
 import { NotificationList } from '@/components/notifications';
