@@ -22,7 +22,7 @@ describe('independent page caches', () => {
     const first = store.dispatch(pageLoaders.orders())
     await store.dispatch(pageLoaders.orders())
     expect(fetch).toHaveBeenCalledTimes(1)
-    expect(fetch.mock.calls[0][0]).toBe('/api/orders')
+    expect(fetch.mock.calls[0][0]).toMatch(/\/api\/orders$/)
     resolve(new Response(JSON.stringify(orders), { status: 200 }))
     await first
     expect(store.getState().pages.orders.data).toEqual(orders)

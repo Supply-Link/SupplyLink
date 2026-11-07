@@ -8,19 +8,19 @@ import type { ComponentType } from 'react'
 import type { PageName, PagePayloads } from '../state/pages/types'
 import type { Role, User } from '../types'
 import { PageContext } from '../state/pageContext'
-import { Dashboard } from './DashboardScreen'
-import { Catalog } from './CatalogScreen'
-import { Orders } from './OrdersScreen'
-import { Deliveries } from './DeliveriesScreen'
-import { Payments } from './PaymentsScreen'
-import { Credit } from './CreditScreen'
-import { People } from './PeopleScreen'
-import { Pricing } from './PricingScreen'
-import { Activity } from './ActivityScreen'
-import { Business } from './BusinessScreen'
-import { Directory } from './DirectoryScreen'
-import { Notifications } from './NotificationsScreen'
-import { Inventory } from './InventoryScreen'
+import { DashboardScreen as Dashboard } from './DashboardScreen'
+import { CatalogScreen as Catalog } from './CatalogScreen'
+import { OrdersScreen as Orders } from './OrdersScreen'
+import { DeliveriesScreen as Deliveries } from './DeliveriesScreen'
+import { PaymentsScreen as Payments } from './PaymentsScreen'
+import { CreditScreen as Credit } from './CreditScreen'
+import { PeopleScreen as People } from './PeopleScreen'
+import { PricingScreen as Pricing } from './PricingScreen'
+import { ActivityScreen as Activity } from './ActivityScreen'
+import { BusinessScreen as Business } from './BusinessScreen'
+import { DirectoryScreen as Directory } from './DirectoryScreen'
+import { NotificationsScreen as Notifications } from './NotificationsScreen'
+import { InventoryScreen as Inventory } from './InventoryScreen'
 
 const auth = vi.hoisted(() => ({ role: 'admin' as Role }))
 vi.mock('../providers/AppProviders', () => ({
@@ -48,7 +48,7 @@ const pages: Array<[Exclude<PageName, 'shell'>, ComponentType, Role[]]> = [
   ['catalog', Catalog, ['retailer']],
   ['orders', Orders, ['admin', 'distributor', 'retailer']],
   ['deliveries', Deliveries, ['admin', 'distributor', 'delivery']],
-  ['payments', Payments, ['admin', 'distributor', 'retailer', 'delivery']],
+  ['payments', Payments, ['distributor']],
   ['credit', Credit, ['admin', 'retailer']],
   ['inventory', Inventory, ['admin', 'distributor']],
   ['people', People, ['admin']], ['pricing', Pricing, ['admin']],

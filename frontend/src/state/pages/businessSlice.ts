@@ -1,14 +1,50 @@
-import { createPageMutation } from './createPageMutation'
-import type { BusinessInput, User } from '../../types'
+import { createAsyncThunk, createSlice, isAnyOf } from '@reduxjs/toolkit'
 import { request } from '../../lib/http'
+import { invalidatePages, refreshPages } from './events'
+import { clearSession, setAuth, setLicense, signIn, signOut } from './authSlice'
+import type { BusinessInput, User } from '../../types'
 import type { PagePayloads } from './types'
-import { createPageSlice } from './createPageSlice'
 
-const { load, reducer } = createPageSlice('business', (signal) =>
-  request<PagePayloads['business']>('/api/business', { signal }),
+type State = { data: PagePayloads['business'] | null; status: 'idle' | 'loading' | 'ready' | 'error'; error: string | null; requestId?: string }
+const initialState: State = { data: null, status: 'idle', error: null }
+
+export const loadBusiness = createAsyncThunk(
+  'business/load',
+  (_, { signal }) => request<PagePayloads['business']>('/business', { signal }),
+  { condition: (_, { getState }) => (getState() as any).pages.business.status !== 'loading' },
 )
-export { load as loadBusiness }
-export default reducer
 
-export const saveBusiness = createPageMutation('commands/saveBusiness', (body: BusinessInput, { signal }) =>
-  request<Pick<User, 'id' | 'business' | 'legal_name' | 'address' | 'gstin' | 'state_code' | 'drug_license'>>('/api/business', { body, signal }), ['business', 'dashboard', 'catalog', 'orders', 'payments', 'inventory', 'people', 'activity', 'shell'])
+export const saveBusiness = createAsyncThunk(
+  'business/save',
+  async (body: BusinessInput, { dispatch, signal }) => {
+    const result = await request<Pick<User, 'id' | 'business' | 'legal_name' | 'address' | 'gstin' | 'state_code' | 'drug_license'>>('/business', { body, signal })
+    dispatch(invalidatePages(['business', 'dashboard', 'catalog', 'orders', 'payments', 'inventory', 'people', 'activity', 'shell']))
+    return result
+  },
+)
+
+const businessSlice = createSlice({
+  name: 'business',
+  initialState,
+  reducers: {},
+  extraReducers: (builder) => {
+    builder
+      .addCase(loadBusiness.pending, (state, action) => { state.status = 'loading'; state.error = null; state.requestId = action.meta.requestId })
+      .addCase(loadBusiness.fulfilled, (state, action) => {
+        if (state.requestId !== action.meta.requestId) return
+        state.data = action.payload; state.status = 'ready'; state.requestId = undefined
+      })
+      .addCase(loadBusiness.rejected, (state, action) => {
+        if (state.requestId !== action.meta.requestId) return
+        state.status = 'error'; state.error = action.error.message ?? 'Unable to load this page.'; state.requestId = undefined
+      })
+      .addCase(invalidatePages, (state, action) => {
+        if (action.payload.includes('business')) { state.status = 'idle'; state.requestId = undefined; state.error = null }
+      })
+      .addCase(refreshPages, (state) => { if (state.status === 'ready') state.status = 'idle' })
+      .addMatcher(isAnyOf(clearSession, setAuth, signIn.fulfilled, signOut.fulfilled), () => initialState)
+      .addMatcher(isAnyOf(setLicense), (state, action) => action.payload.usable ? state : initialState)
+  },
+})
+
+export default businessSlice.reducer

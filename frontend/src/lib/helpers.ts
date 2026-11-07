@@ -27,7 +27,7 @@ const routeRoles: Record<string, Role[]> = {
   catalog: ['retailer'],
   orders: ['admin', 'distributor', 'retailer'],
   deliveries: ['admin', 'distributor', 'delivery'],
-  payments: ['admin', 'distributor', 'retailer', 'delivery'],
+  payments: ['distributor'],
   credit: ['admin', 'retailer'],
   inventory: ['admin', 'distributor'],
   people: ['admin'],

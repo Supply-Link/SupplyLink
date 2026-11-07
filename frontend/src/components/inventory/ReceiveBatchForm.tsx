@@ -6,10 +6,10 @@ import { Button, Notice } from '..'
 import { useToast } from '../../providers/AppProviders'
 import type { Product } from '../../types'
 
-export function ReceiveBatchForm({ product, close }: { product: Product; close: () => void }) {
+export function ReceiveBatchForm({ product, onClose }: { product: Product; onClose: () => void }) {
   const dispatch = useAppDispatch()
   const toast = useToast()
-  const [values, setValues] = useState({ batch_number: '', manufacturing_date: '', expiry_date: '', stock: '', mrp: '', purchase_price: '', source: 'new' })
+  const [values, setValues] = useState({ batch_number: '', manufacturing_date: '', expiry_date: '', stock: '', mrp: '', purchase_price: '', source: 'new' as 'new' | 'unallocated' })
   const set = (name: keyof typeof values, value: string) => setValues((current) => ({ ...current, [name]: value }))
   const mutation = useMutation({
     mutationFn: () => dispatch(receiveBatch({
@@ -20,9 +20,9 @@ export function ReceiveBatchForm({ product, close }: { product: Product; close: 
       stock: Number(values.stock),
       mrp: Math.round(Number(values.mrp) * 100),
       purchase_price: Math.round(Number(values.purchase_price) * 100),
-      source: values.source as 'new' | 'unallocated',
+      source: values.source,
     })).unwrap(),
-    onSuccess: async () => { toast('Batch received.'); close() },
+    onSuccess: async () => { toast('Batch received.'); onClose() },
     onError: (error) => toast(error.message, 'error'),
   })
   return <form onSubmit={(event) => { event.preventDefault(); mutation.mutate() }}>
@@ -36,6 +36,6 @@ export function ReceiveBatchForm({ product, close }: { product: Product; close: 
       <label>Purchase price excl. GST (₹)<input required min="0" step=".01" type="number" value={values.purchase_price} onChange={(event) => set('purchase_price', event.target.value)} /></label>
       {Boolean(product.unallocated_stock) && <label>Stock source<select value={values.source} onChange={(event) => set('source', event.target.value)}><option value="new">New receipt</option><option value="unallocated">Allocate historical stock ({product.unallocated_stock} packs)</option></select></label>}
     </div>
-    <div className="modal-actions"><Button type="button" variant="secondary" onClick={close}>Cancel</Button><Button type="submit" disabled={mutation.isPending}>Receive batch</Button></div>
+    <div className="modal-actions"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={mutation.isPending}>Receive batch</Button></div>
   </form>
 }
