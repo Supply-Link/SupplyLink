@@ -9,10 +9,10 @@ import { Button } from '../ui'
 export function PageDataBoundary({ page, children }: { page: Exclude<PageName, 'shell'>; children: ReactNode }) {
   const dispatch = useAppDispatch()
   const { data, status, error } = useAppSelector((state) => state.pages[page])
-  useEffect(() => { if (status === 'idle') void dispatch(pageLoaders[page]()) }, [dispatch, page, status])
+  useEffect(() => { if (status === 'idle') void dispatch(pageLoaders[page]() as any) }, [dispatch, page, status])
   if (!data && status !== 'error') return <WorkspaceSkeleton />
   return <>
-    {error && <div className="notice amber" role="alert">{error} <Button variant="secondary" onClick={() => void dispatch(pageLoaders[page]())}>Try again</Button></div>}
+    {error && <div className="notice amber" role="alert">{error} <Button variant="secondary" onClick={() => void dispatch(pageLoaders[page]() as any)}>Try again</Button></div>}
     {data && <PageContext.Provider value={data}>{children}</PageContext.Provider>}
   </>
 }

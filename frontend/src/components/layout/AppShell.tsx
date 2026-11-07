@@ -46,9 +46,9 @@ export function AppShell({ pending = false }: { pending?: boolean }) {
     <aside className="sidebar" id="sidebar">
       <div className="brand"><span><PackageCheck /></span>SupplyLink</div>
       <div className="workspace-label">{role ? ROLE_NAMES[role] : 'SupplyLink'} workspace</div>
-      <nav>{nav.filter((item) => role ? item.roles.includes(role) : item.to === '/').map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/'}><item.icon /> {item.label}</NavLink>)}</nav>
+      <nav>{nav?.filter((item) => role ? item.roles.includes(role) : item.to === '/').map((item) => <NavLink key={item.to} to={item.to} end={item.to === '/'}><item.icon /> {item.label}</NavLink>)}</nav>
       <div className="sidebar-footer">
-        <div className="local-note"><b><i />Local workspace</b>Changes saved to your data file.<br />INR · Manual payments</div>
+        <div className="local-note"><b><i aria-hidden="true" />Local workspace</b>Changes saved to your data file.<br />INR · Manual payments</div>
         {user && <div className="profile"><Avatar name={user.name} /><div><strong>{user.name}</strong><small>{ROLE_NAMES[user.role]}</small></div><IconButton label="Sign out" onClick={() => void logout()}><LogOut /></IconButton></div>}
       </div>
     </aside>

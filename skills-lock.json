@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "icon-designer": {
+      "source": "aicodedecode/awesome-muse-skills",
+      "sourceType": "github",
+      "skillPath": "skills/icon-designer/SKILL.md",
+      "computedHash": "4674f512b2d0a72bf427016e531450aab01321dcb7cf1fa3d11bd0436f30019c"
+    }
+  }
+}

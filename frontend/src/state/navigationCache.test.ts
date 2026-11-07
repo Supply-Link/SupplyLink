@@ -28,13 +28,16 @@ describe('navigation persistence', () => {
 
   it('replaces the cached role with the server-verified role', () => {
     const store = createAppStore()
+    store.dispatch(loadMe.pending('me-1', undefined))
     store.dispatch(loadMe.fulfilled(response('admin'), 'me-1', undefined))
+    store.dispatch(loadMe.pending('me-2', undefined))
     store.dispatch(loadMe.fulfilled(response('retailer'), 'me-2', undefined))
     expect(readNavigationRole()).toBe('retailer')
   })
 
   it.each(['logout', 'expired-session'])('removes cached navigation after %s', (reason) => {
     const store = createAppStore()
+    store.dispatch(loadMe.pending('me-1', undefined))
     store.dispatch(loadMe.fulfilled(response('admin'), 'me-1', undefined))
     store.dispatch(reason === 'logout' ? signOut.fulfilled({ ok: true }, 'logout', undefined) : clearSession())
     expect(readNavigationRole()).toBeNull()
@@ -50,6 +53,7 @@ describe('navigation persistence', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('Storage blocked') })
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage blocked') })
     const store = createAppStore()
+    store.dispatch(loadMe.pending('me-1', undefined))
     store.dispatch(loadMe.fulfilled(response('admin'), 'me-1', undefined))
     expect(store.getState().auth.user?.role).toBe('admin')
   })

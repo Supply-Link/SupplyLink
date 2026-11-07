@@ -15,7 +15,7 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required.').max(128),
 })
 
-export function Login() {
+export function LoginScreen() {
   const { user, license, login } = useAuth()
   const [serverError, setServerError] = useState('')
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof loginSchema>>({
@@ -28,7 +28,7 @@ export function Login() {
       setServerError(error instanceof Error ? error.message : 'Sign in failed.')
     }
   })
-  const demo = async (role: Role) => {
+  const handleDemoSignIn = async (role: Role) => {
     setServerError('')
     try { await login(`${role}@supplylink.local`, 'Demo@123') } catch (error) {
       setServerError(error instanceof Error ? error.message : 'Sign in failed.')
@@ -53,7 +53,7 @@ export function Login() {
         <div className="divider">Explore a demo workspace</div>
         <div className="role-grid">
           {(['admin', 'distributor', 'retailer', 'delivery'] as Role[]).map((role) => (
-            <button key={role} onClick={() => void demo(role)}>
+            <button key={role} onClick={() => void handleDemoSignIn(role)}>
               {{ admin: <ShieldCheck />, distributor: <Box />, retailer: <ShoppingCart />, delivery: <Truck /> }[role]}
               <span><strong>{ROLE_NAMES[role]}</strong><small>Explore this workspace</small></span>
             </button>

@@ -27,7 +27,7 @@ const registerSchema = z.object({
   path: ['confirm_password'],
 })
 
-export function Register() {
+export function RegisterScreen() {
   const dispatch = useAppDispatch()
   const { user, license, booting } = useAuth()
   const navigate = useNavigate()

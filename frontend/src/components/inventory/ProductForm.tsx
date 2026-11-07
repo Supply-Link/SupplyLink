@@ -10,12 +10,12 @@ import type { Product, ProductInput } from '../../types'
 export function ProductForm({
   product,
   state,
-  close,
+  onClose,
   onCreated,
 }: {
   product?: Product
   state: PagePayloads['inventory']
-  close: () => void
+  onClose: () => void
   onCreated: (product: Product) => void
 }) {
   const dispatch = useAppDispatch()
@@ -24,7 +24,7 @@ export function ProductForm({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
   const [importErrors, setImportErrors] = useState<string[]>([])
-  const distributors = state.users.filter((person) => person.role === 'distributor' && person.active)
+  const distributors = state.users?.filter((person) => person.role === 'distributor' && person.active)
   const [values, setValues] = useState({
     name: product?.name || '',
     brand: product?.brand || 'Generic medicine',
@@ -140,7 +140,7 @@ export function ProductForm({
 
       if (errors.length === 0) {
         toast(`${created} medicines imported successfully.`)
-        close()
+        onClose()
       } else {
         toast(
           `${created} imported; ${errors.length} failed. Check the row errors below.`,
@@ -163,7 +163,7 @@ export function ProductForm({
     mutationFn: (body: ProductInput) => dispatch(saveProduct(body)).unwrap(),
     onSuccess: async (savedProduct) => {
         toast(product ? 'Medicine saved.' : 'Medicine created. Add a batch to make it orderable.')
-      if (product) close()
+      if (product) onClose()
       else onCreated(savedProduct)
     },
     onError: (error) => toast(error.message, 'error'),
@@ -227,7 +227,7 @@ export function ProductForm({
       </>
     )}
     <div className="modal-actions">
-      <Button type="button" variant="secondary" onClick={close} disabled={importing}>Cancel</Button>
+      <Button type="button" variant="secondary" onClick={onClose} disabled={importing}>Cancel</Button>
       {!product && (<Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={importing || mutation.isPending}>{importing ? 'Importing…' : 'Import from Excel'}</Button>)}
       <Button type="submit" disabled={mutation.isPending || importing}>
         {product ? 'Save medicine' : 'Create medicine'}

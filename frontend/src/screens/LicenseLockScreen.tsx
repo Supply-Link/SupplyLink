@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { Button } from '../components/ui'
 import { useAuth } from '../providers/AppProviders'
 
-export function LicenseLock() {
+export function LicenseLockScreen() {
   const { user, license, logout } = useAuth()
   if (!user) return <Navigate to="/login" replace />
   return (

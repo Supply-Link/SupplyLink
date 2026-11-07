@@ -1,9 +1,40 @@
+import { createAsyncThunk, createSlice, isAnyOf } from '@reduxjs/toolkit'
 import { request } from '../../lib/http'
+import { invalidatePages, refreshPages } from './events'
+import { clearSession, setAuth, setLicense, signIn, signOut } from './authSlice'
 import type { PagePayloads } from './types'
-import { createPageSlice } from './createPageSlice'
 
-const { load, reducer } = createPageSlice('activity', (signal) =>
-  request<PagePayloads['activity']>('/api/activity', { signal }),
+type State = { data: PagePayloads['activity'] | null; status: 'idle' | 'loading' | 'ready' | 'error'; error: string | null; requestId?: string }
+const initialState: State = { data: null, status: 'idle', error: null }
+
+export const loadActivity = createAsyncThunk(
+  'activity/load',
+  (_, { signal }) => request<PagePayloads['activity']>('/activity', { signal }),
+  { condition: (_, { getState }) => (getState() as any).pages.activity.status !== 'loading' },
 )
-export { load as loadActivity }
-export default reducer
+
+const activitySlice = createSlice({
+  name: 'activity',
+  initialState,
+  reducers: {},
+  extraReducers: (builder) => {
+    builder
+      .addCase(loadActivity.pending, (state, action) => { state.status = 'loading'; state.error = null; state.requestId = action.meta.requestId })
+      .addCase(loadActivity.fulfilled, (state, action) => {
+        if (state.requestId !== action.meta.requestId) return
+        state.data = action.payload; state.status = 'ready'; state.requestId = undefined
+      })
+      .addCase(loadActivity.rejected, (state, action) => {
+        if (state.requestId !== action.meta.requestId) return
+        state.status = 'error'; state.error = action.error.message ?? 'Unable to load this page.'; state.requestId = undefined
+      })
+      .addCase(invalidatePages, (state, action) => {
+        if (action.payload.includes('activity')) { state.status = 'idle'; state.requestId = undefined; state.error = null }
+      })
+      .addCase(refreshPages, (state) => { if (state.status === 'ready') state.status = 'idle' })
+      .addMatcher(isAnyOf(clearSession, setAuth, signIn.fulfilled, signOut.fulfilled), () => initialState)
+      .addMatcher(isAnyOf(setLicense), (state, action) => action.payload.usable ? state : initialState)
+  },
+})
+
+export default activitySlice.reducer
