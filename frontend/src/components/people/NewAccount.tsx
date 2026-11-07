@@ -7,7 +7,7 @@ import { ROLE_NAMES } from '../../lib/constants'
 import { useToast } from '../../providers/AppProviders'
 import type { Role } from '../../types'
 
-export function NewAccount({ close }: { close: () => void }) {
+export function NewAccount({ onClose }: { onClose: () => void }) {
   const dispatch = useAppDispatch()
   const toast = useToast()
   const [values, setValues] = useState({ name: '', business: '', email: '', password: '', role: 'retailer' as Role, credit_limit: '0', address: '' })
@@ -20,7 +20,7 @@ export function NewAccount({ close }: { close: () => void }) {
       role: values.role,
       ...(values.role === 'retailer' ? { credit_limit: Math.round(Number(values.credit_limit) * 100), address: values.address } : {}),
     })).unwrap(),
-    onSuccess: async () => { toast('Account created.'); close() },
+    onSuccess: async () => { toast('Account created.'); onClose() },
     onError: (error) => toast(error.message, 'error'),
   })
   return <form onSubmit={(event) => { event.preventDefault(); mutation.mutate() }}>
@@ -29,9 +29,9 @@ export function NewAccount({ close }: { close: () => void }) {
       <label>Business / team<input required maxLength={100} value={values.business} onChange={(event) => setValues({ ...values, business: event.target.value })} /></label>
       <label>Email address<input required type="email" maxLength={150} value={values.email} onChange={(event) => setValues({ ...values, email: event.target.value })} /></label>
       <label>Temporary password<input required type="password" minLength={10} maxLength={128} value={values.password} onChange={(event) => setValues({ ...values, password: event.target.value })} /></label>
-      <label>Workspace role<select value={values.role} onChange={(event) => setValues({ ...values, role: event.target.value as Role })}>{Object.entries(ROLE_NAMES).map(([role, name]) => <option key={role} value={role}>{name}</option>)}</select></label>
+      <label>Workspace role<select value={values.role} onChange={(event) => { const value = event.target.value; if (value in ROLE_NAMES) setValues({ ...values, role: value as Role }) }}>{Object.entries(ROLE_NAMES).map(([role, name]) => <option key={role} value={role}>{name}</option>)}</select></label>
       {values.role === 'retailer' && <><label>Trade credit limit (₹)<input required min="0" step=".01" type="number" value={values.credit_limit} onChange={(event) => setValues({ ...values, credit_limit: event.target.value })} /></label><label className="full">Delivery address<textarea required maxLength={500} value={values.address} onChange={(event) => setValues({ ...values, address: event.target.value })} /></label></>}
     </div>
-    <div className="modal-actions"><Button type="button" variant="secondary" onClick={close}>Cancel</Button><Button type="submit" disabled={mutation.isPending}>Create account</Button></div>
+    <div className="modal-actions"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" disabled={mutation.isPending}>Create account</Button></div>
   </form>
 }

@@ -24,10 +24,18 @@ let onUnauthorized: (() => void) | undefined
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/+$/, '')
 const crossOriginApi = /^https?:\/\//i.test(apiBaseUrl)
 
-function apiUrl(path: string) {
-  const endpoint = path.startsWith('/api') ? path.slice(4) : path
-  return `${apiBaseUrl}${endpoint}`
+const REQUEST_TIMEOUT_MS = 30_000
+
+function withTimeout(signal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  if (!signal) return timeout
+  const controller = new AbortController()
+  signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true })
+  timeout.addEventListener('abort', () => controller.abort(new DOMException('Request timed out.', 'TimeoutError')), { once: true })
+  return controller.signal
 }
+
+function apiUrl(path: string) { return `${apiBaseUrl}${path}` }
 
 export function configureApi(options: {
   csrf?: string
@@ -48,11 +56,11 @@ export async function request<T>(
   options: { body?: unknown; idempotencyKey?: string; signal?: AbortSignal } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {}
-  const init: RequestInit = { credentials: crossOriginApi ? 'include' : 'same-origin', headers, signal: options.signal }
+  const init: RequestInit = { credentials: crossOriginApi ? 'include' : 'same-origin', headers, signal: withTimeout(options.signal) }
   if (options.body !== undefined) {
     init.method = 'POST'
     headers['Content-Type'] = 'application/json'
-    headers['X-CSRF-Token'] = csrfToken
+    if (csrfToken) headers['X-CSRF-Token'] = csrfToken
     if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey
     init.body = JSON.stringify(options.body)
   }
@@ -69,7 +77,7 @@ export async function request<T>(
     if (response.status === 423 && problem.code === 'SOFTWARE_LICENSE_BLOCKED' && problem.license) {
       onLicenseBlocked?.(problem.license)
     }
-    if (response.status === 401 && path !== '/api/login') onUnauthorized?.()
+    if (response.status === 401 && path !== '/login') onUnauthorized?.()
     throw new ApiError(problem.error || 'Request failed.', response.status, problem.code, problem.license)
   }
   return data as T

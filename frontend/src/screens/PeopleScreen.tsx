@@ -14,7 +14,7 @@ import { useAuth, useToast } from '../providers/AppProviders'
 import { usePageData } from '../state/pageContext'
 import type { User } from '../types'
 
-export function People() {
+export function PeopleScreen() {
   const dispatch = useAppDispatch()
   const state = usePageData<'people'>()
   const { user } = useAuth()
@@ -24,8 +24,9 @@ export function People() {
   const [newAccount, setNewAccount] = useState(false)
   const [review, setReview] = useState<User | null>(null)
   const [confirmToggle, setConfirmToggle] = useState<User | null>(null)
-  const pending = state.users.filter((person) => person.approval_status === 'pending').length
-  const people = state.users.filter((person) => {
+  const users = state?.users ?? []
+  const pending = users.filter((person) => person.approval_status === 'pending').length
+  const people = users.filter((person) => {
     const filterMatch = filter === 'all' || (filter === 'pending' ? person.approval_status === 'pending' : person.role === filter)
     return filterMatch && `${person.name} ${person.email || ''} ${person.business}`.toLowerCase().includes(query.toLowerCase())
   })
@@ -57,11 +58,11 @@ export function People() {
     },
   ]
   return <>
-    <PageHeader title="People, roles & access" subtitle="Approve registrations and control portal and LDAP access." eyebrow={state.user.business} actions={<Button onClick={() => setNewAccount(true)}><Plus /> Add account</Button>} />
+    <PageHeader title="People, roles & access" subtitle="Approve registrations and control portal and LDAP access." eyebrow={state?.user?.business} actions={<Button onClick={() => setNewAccount(true)}><Plus /> Add account</Button>} />
     <div className="toolbar"><Tabs value={filter} options={[{ value: 'all', label: 'All accounts' }, { value: 'pending', label: `Pending requests${pending ? ` · ${pending}` : ''}` }, ...Object.entries(ROLE_NAMES).map(([value, name]) => ({ value, label: name }))]} onChange={setFilter} /><SearchInput value={query} onChange={setQuery} placeholder="Search name, business or email" /></div>
     <Card><DataTable rows={people} columns={peopleColumns} rowKey={(person) => person.id} emptyTitle="No matching accounts" emptyMessage="Try another search or view pending requests." /></Card>
-    {newAccount && <Modal title="Add an account" subtitle="Create access to the appropriate workspace." onClose={() => setNewAccount(false)}><NewAccount close={() => setNewAccount(false)} /></Modal>}
-    {review && <Modal title="Review access request" subtitle={review.email} onClose={() => setReview(null)}><ReviewRegistration person={review} close={() => setReview(null)} /></Modal>}
+    {newAccount && <Modal title="Add an account" subtitle="Create access to the appropriate workspace." onClose={() => setNewAccount(false)}><NewAccount onClose={() => setNewAccount(false)} /></Modal>}
+    {review && <Modal title="Review access request" subtitle={review.email} onClose={() => setReview(null)}><ReviewRegistration person={review} onClose={() => setReview(null)} /></Modal>}
     <ConfirmDialog open={Boolean(confirmToggle)} title={`${confirmToggle?.active ? 'Deactivate' : 'Activate'} account?`} description={confirmToggle?.active ? 'This account will lose portal access and active sessions will be revoked. Existing records are retained.' : 'This account will regain access to its assigned workspace.'} confirmLabel={confirmToggle?.active ? 'Deactivate account' : 'Activate account'} danger={Boolean(confirmToggle?.active)} pending={toggle.isPending} onClose={() => setConfirmToggle(null)} onConfirm={() => confirmToggle && toggle.mutate(confirmToggle)} />
   </>
 }

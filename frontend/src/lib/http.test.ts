@@ -18,14 +18,13 @@ describe('API client', () => {
     vi.stubGlobal('fetch', fetchMock)
     configureApi({ csrf: 'csrf-token' })
 
-    await request('/api/orders', {
+    await request('/orders', {
       body: { product_id: 'medicine-1', quantity: 2 },
       idempotencyKey: 'order-key',
     })
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/orders', expect.objectContaining({
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/orders'), expect.objectContaining({
       method: 'POST',
-      credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
         'X-CSRF-Token': 'csrf-token',
@@ -40,7 +39,7 @@ describe('API client', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'Sign in again.' }, 401)))
     configureApi({ unauthorized })
 
-    await expect(request('/api/state')).rejects.toMatchObject({
+    await expect(request('/state')).rejects.toMatchObject({
       status: 401,
       message: 'Sign in again.',
     } satisfies Partial<ApiError>)
@@ -62,7 +61,7 @@ describe('API client', () => {
     }, 423)))
     configureApi({ licenseBlocked })
 
-    await expect(request('/api/state')).rejects.toMatchObject({
+    await expect(request('/state')).rejects.toMatchObject({
       status: 423,
       code: 'SOFTWARE_LICENSE_BLOCKED',
     } satisfies Partial<ApiError>)

@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import type {
   ButtonHTMLAttributes, HTMLAttributes, ReactNode,
 } from 'react'
@@ -53,8 +54,29 @@ export function Modal({
   onClose: () => void
   wide?: boolean
 }) {
+  const dialogRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const dialog = dialogRef.current
+    const focusable = dialog?.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    focusable?.[0]?.focus()
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { onClose(); return }
+      if (event.key !== 'Tab' || !focusable?.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-    <section className={`modal ${wide ? 'modal-wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+    <section ref={dialogRef} className={`modal ${wide ? 'modal-wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
       <header><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><IconButton label="Close" onClick={onClose}><X /></IconButton></header>
       <div className="modal-body">{children}</div>
     </section>
