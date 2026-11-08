@@ -1,3 +1,6 @@
+// ToastProvider — floating toast overlay anchored above the tab bar
+// with 3.5-second auto-dismiss.
+
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';

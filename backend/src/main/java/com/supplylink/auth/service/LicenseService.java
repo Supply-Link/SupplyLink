@@ -70,6 +70,9 @@ public class LicenseService {
             r.put("usable",     usable);
             r.put("type",       "licensed");
             r.put("expires_on", expiresOn);
+            r.put("expires_at", cutoff.minusSeconds(1).toOffsetDateTime().toString());
+            r.put("timezone",   "Asia/Kolkata");
+            r.put("server_time", Instant.now().toString());
             r.put("customer",   payload.getOrDefault("customer", ""));
             return r;
 
@@ -95,10 +98,22 @@ public class LicenseService {
     }
 
     private static Map<String, Object> unconfigured() {
-        return Map.of("status", "unconfigured", "usable", false, "type", "none");
+        return unusable("unconfigured");
     }
 
     private static Map<String, Object> invalid() {
-        return Map.of("status", "invalid", "usable", false, "type", "none");
+        return unusable("invalid");
+    }
+
+    private static Map<String, Object> unusable(String status) {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("status", status);
+        r.put("usable", false);
+        r.put("type", "none");
+        r.put("expires_on", null);
+        r.put("expires_at", null);
+        r.put("timezone", "Asia/Kolkata");
+        r.put("server_time", Instant.now().toString());
+        return r;
     }
 }

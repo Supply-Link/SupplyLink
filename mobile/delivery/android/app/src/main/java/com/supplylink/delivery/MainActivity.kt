@@ -11,6 +11,7 @@ class MainActivity : ReactActivity() {
   override fun getMainComponentName(): String = "main"
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    setTheme(R.style.AppTheme)
     if (!BuildConfig.DEBUG) {
       window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
     }

@@ -1,3 +1,6 @@
+// Register screen — new-account form for pharmacy retailers;
+// admin approval required before sign-in.
+
 import { useRouter } from '@/navigation/router';
 import { Send } from 'lucide-react-native';
 import { useState } from 'react';

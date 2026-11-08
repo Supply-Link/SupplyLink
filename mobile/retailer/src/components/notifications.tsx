@@ -1,3 +1,6 @@
+// NotificationList component — renders unread/read notification cards
+// in reverse chronological order with an unread dot indicator.
+
 import type { LucideIcon } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 import { dateTime } from '@/lib/rules';

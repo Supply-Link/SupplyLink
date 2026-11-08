@@ -1,3 +1,6 @@
+// RootNavigator — NavigationContainer with phase-gated screens:
+// signedOut → SignIn/Register, locked → Locked, ready → Tabs + detail screens.
+
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View } from 'react-native';

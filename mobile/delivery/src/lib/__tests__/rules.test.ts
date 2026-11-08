@@ -1,3 +1,6 @@
+// Unit tests for rules — server URL normalisation, money formatting,
+// IST dates, coordinate validation, status helpers, and licence expiry.
+
 import {
   cancellable,
   coordinate,

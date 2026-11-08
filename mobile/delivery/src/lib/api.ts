@@ -1,3 +1,6 @@
+// Api class — fetch wrapper with in-memory session cookie, CSRF token,
+// 20-second timeout, 4 MB response cap, and typed ApiFailure errors.
+
 const SESSION_COOKIE = 'supplylink_session';
 const TIMEOUT_MS = 20000;
 const MAX_RESPONSE_CHARS = 4 * 1024 * 1024;

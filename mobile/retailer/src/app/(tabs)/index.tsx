@@ -1,3 +1,6 @@
+// Home tab — active-order summary card, available trade-credit card,
+// and quick-navigation buttons to medicines, finance, records, and alerts.
+
 import { useRouter } from '@/navigation/router';
 import { Bell, CreditCard, FileText, LayoutGrid, Pill, RefreshCw } from 'lucide-react-native';
 import { Text, View } from 'react-native';

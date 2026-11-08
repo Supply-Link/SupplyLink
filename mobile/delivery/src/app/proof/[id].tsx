@@ -1,9 +1,12 @@
+// Proof-of-delivery screen — recipient name field and SVG signature canvas
+// (20 strokes × 200 points on a 1000×1000 grid); confirms handoff.
+
 import { useLocalSearchParams, useRouter } from '@/navigation/router';
 import { Eraser, PenLine } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Text, View, type GestureResponderEvent } from 'react-native';
 import Svg, { Polyline } from 'react-native-svg';
-import { Button, Card, EmptyState, Field, Muted, Screen, Title } from '@/components/ui';
+import { Button, Card, colors, EmptyState, Field, Muted, Screen, Title } from '@/components/ui';
 import { useSession } from '@/session/SessionProvider';
 
 const SIZE = 1000;
@@ -76,7 +79,7 @@ export default function ProofScreen() {
       </Card>
       <Card>
         <View className="flex-row items-center">
-          <PenLine size={18} color="#173d34" />
+          <PenLine size={18} color={colors.brand} />
           <Text className="ml-2 text-base font-bold text-ink">Signature</Text>
         </View>
         <Muted>Sign inside the box with a finger or stylus.</Muted>
@@ -90,7 +93,7 @@ export default function ProofScreen() {
         >
           <Svg width="100%" height="100%" viewBox={`0 0 ${SIZE} ${SIZE}`} pointerEvents="none">
             {strokes.map((stroke, index) => (
-              <Polyline key={index} points={stroke.map((p) => p.join(',')).join(' ')} fill="none" stroke="#173d34" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+              <Polyline key={index} points={stroke.map((p) => p.join(',')).join(' ')} fill="none" stroke={colors.brand} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
             ))}
           </Svg>
         </View>

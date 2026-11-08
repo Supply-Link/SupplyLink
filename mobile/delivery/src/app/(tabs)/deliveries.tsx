@@ -1,3 +1,6 @@
+// Deliveries tab — list of all assigned delivery orders
+// with live status badges.
+
 import { RefreshCw, Truck } from 'lucide-react-native';
 import { OrderCard } from '@/components/orders';
 import { Button, EmptyState, Screen } from '@/components/ui';
