@@ -89,6 +89,23 @@ public class PageService {
         return r;
     }
 
+    /** Aggregate snapshot for GET /api/state (used by the mobile apps). */
+    @Transactional(readOnly = true)
+    public Map<String, Object> state(Map<String, Object> user) {
+        String userId = (String) user.get("id");
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("user",          UserRepository.safeUser(user));
+        r.put("business_date", java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")).toString());
+        r.put("orders",        orderService.getOrdersForUser(user));
+        r.put("products",      "delivery".equals(user.get("role"))
+                                   ? Collections.emptyList()
+                                   : productService.getProductsForUser(user));
+        r.put("payments",      paymentsPage(user).get("payments"));
+        r.put("notifications", notifications.findByUserId(userId));
+        r.put("pricing",       pricingService.getPricing());
+        return r;
+    }
+
     @Transactional(readOnly = true)
     public Map<String, Object> catalog(Map<String, Object> user) {
         List<Map<String, Object>> productList = productService.getProductsForUser(user);
