@@ -1,3 +1,6 @@
+// Medicines tab — searchable product catalog with live stock, price, and GST;
+// add-to-basket and batch-details actions per product.
+
 import { useRouter } from '@/navigation/router';
 import { Cross, PackageSearch, Plus, Search } from 'lucide-react-native';
 import { useMemo, useState } from 'react';

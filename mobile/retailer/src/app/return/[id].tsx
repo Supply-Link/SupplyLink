@@ -1,3 +1,6 @@
+// Return request screen — view existing return status or submit
+// a new return reason with an idempotency-keyed POST.
+
 import { useLocalSearchParams, useRouter } from '@/navigation/router';
 import { RotateCcw } from 'lucide-react-native';
 import { useState } from 'react';
@@ -11,7 +14,13 @@ export default function ReturnScreen() {
   const { workspace, request, refresh, keyFor, dropKey, showError, busy } = useSession();
   const order = workspace?.orders.find((entry) => entry.id === id);
   const [reason, setReason] = useState('');
-  if (!order) return <Screen title="Return request" onBack={router.back} bottomInset><EmptyState message="This order is unavailable." /></Screen>;
+  if (!order) {
+    return (
+      <Screen title="Return request" onBack={router.back} bottomInset>
+        <EmptyState message="This order is unavailable." />
+      </Screen>
+    );
+  }
 
   const submit = async () => {
     if (!reason.trim()) return showError('Describe why you are requesting a return.');

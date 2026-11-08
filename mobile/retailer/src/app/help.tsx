@@ -1,3 +1,6 @@
+// Help screen — quick-answer cards for accounts, medicines/orders,
+// and connectivity issues.
+
 import { useRouter } from '@/navigation/router';
 import { CircleHelp, ClipboardList, Pill, RefreshCw } from 'lucide-react-native';
 import { Button, Card, Muted, Screen, SectionLabel, Title } from '@/components/ui';

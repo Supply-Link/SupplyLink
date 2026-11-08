@@ -1,3 +1,6 @@
+// Account tab — user profile, GSTIN, drug licence, licence status,
+// payment history, and sign-out.
+
 import { useRouter } from '@/navigation/router';
 import { Banknote, Building, CircleHelp, CreditCard, FileText, LogOut, RefreshCw } from 'lucide-react-native';
 import { Text } from 'react-native';

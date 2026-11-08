@@ -1,3 +1,6 @@
+// TabNavigator — bottom tabs: Home, Medicines, Orders,
+// Basket (cart-count badge), and Account.
+
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { House, Pill, ReceiptText, ShoppingBasket, UserRound } from 'lucide-react-native';
 import { colors } from '@/components/ui';

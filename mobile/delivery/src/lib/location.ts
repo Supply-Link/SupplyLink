@@ -1,3 +1,6 @@
+// currentFix — requests ACCESS_FINE_LOCATION, gets a one-shot GPS position,
+// and resolves to a typed Fix or a plain-string error message.
+
 import Geolocation from '@react-native-community/geolocation';
 import { PermissionsAndroid, Platform } from 'react-native';
 import { LOCATION_TIMEOUT_MS } from './config';

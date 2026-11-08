@@ -1,0 +1,35 @@
+{
+  "date": "2026-10-24",
+  "device": "Android 15 / API 35 ARM64 emulator",
+  "backend_tests": 33,
+  "android_tests": [
+    {
+      "suite": "test-results/testDeliveryDebugUnitTest/TEST-com.supplylink.mobile.RulesTest.xml",
+      "tests": 6,
+      "failures": 0
+    },
+    {
+      "suite": "test-results/testRetailerDebugUnitTest/TEST-com.supplylink.mobile.RulesTest.xml",
+      "tests": 6,
+      "failures": 0
+    },
+    {
+      "suite": "outputs/androidTest-results/connected/debug/flavors/delivery/TEST-SupplyLinkQA(AVD) - 15-_app-delivery.xml",
+      "tests": 10,
+      "failures": 0
+    },
+    {
+      "suite": "outputs/androidTest-results/connected/debug/flavors/retailer/TEST-SupplyLinkQA(AVD) - 15-_app-retailer.xml",
+      "tests": 10,
+      "failures": 0
+    }
+  ],
+  "total_automated_tests": 65,
+  "builds": "debug and unsigned release variants successful",
+  "lint": "0 errors; English string localization warning in each variant",
+  "licence": "Main installation remains unconfigured; QA used temporary licences and isolated data",
+  "limitations": [
+    "Physical-device GPS reception and manufacturer-specific behavior not tested",
+    "Customer distribution requires release APK signing and a trusted HTTPS backend"
+  ]
+}

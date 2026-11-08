@@ -1,3 +1,6 @@
+// Account tab — user profile, licence status, collection history,
+// help link, and sign-out.
+
 import { useRouter } from '@/navigation/router';
 import { Banknote, CircleHelp, LogOut, RefreshCw } from 'lucide-react-native';
 import { Text } from 'react-native';

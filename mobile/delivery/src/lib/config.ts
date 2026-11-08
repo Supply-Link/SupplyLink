@@ -1,4 +1,8 @@
-import { Platform } from 'react-native';
+// App configuration — ROLE constant, copy strings, server URL from .env,
+// AsyncStorage key, licence-poll interval, and location timeout.
+
+// @ts-ignore — resolved by babel-plugin react-native-dotenv at build time
+import { SERVER_URL } from '@env';
 
 export const ROLE = 'delivery' as const;
 
@@ -9,11 +13,7 @@ export const APP = {
   businessLabel: 'Delivery team',
 };
 
-export const DEFAULT_SERVER = __DEV__
-  ? Platform.OS === 'android'
-    ? 'http://10.0.2.2:8080'
-    : 'http://127.0.0.1:8080'
-  : '';
+export const DEFAULT_SERVER: string = SERVER_URL || 'https://supplylink-2.onrender.com';
 
 export const SERVER_STORAGE_KEY = 'supplylink.server';
 export const LICENCE_POLL_MS = 15000;

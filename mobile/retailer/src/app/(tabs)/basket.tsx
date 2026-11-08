@@ -1,3 +1,6 @@
+// Basket tab — cart lines with quantity stepper and remove, delivery-address
+// and billing form, server-quote request, and checkout navigation.
+
 import { useRouter } from '@/navigation/router';
 import { Minus, Plus, ReceiptText, ShoppingBasket, Trash } from 'lucide-react-native';
 import { useState } from 'react';

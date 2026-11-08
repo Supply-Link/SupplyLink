@@ -1,3 +1,6 @@
+// Root component — wires SafeAreaProvider, ToastProvider, SessionProvider,
+// CartProvider, and RootNavigator into the app entry point.
+
 import '../global.css';
 
 import { StatusBar } from 'react-native';

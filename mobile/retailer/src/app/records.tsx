@@ -1,3 +1,6 @@
+// Records screen — reverse-chronological order list with links
+// to transaction records and return requests.
+
 import { useRouter } from '@/navigation/router';
 import { FileText, PackageSearch, RotateCcw } from 'lucide-react-native';
 import { Text } from 'react-native';

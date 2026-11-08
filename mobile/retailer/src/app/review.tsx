@@ -1,3 +1,6 @@
+// Review screen — server-calculated quote with line totals, delivery
+// summary, and place-order action using an idempotency key.
+
 import { useRouter } from '@/navigation/router';
 import { CircleCheck } from 'lucide-react-native';
 import { Text } from 'react-native';

@@ -1,3 +1,6 @@
+// Alerts tab — notification list with mark-all-read;
+// unread count shown as a tab-bar badge.
+
 import { Bell, CheckCheck } from 'lucide-react-native';
 import { NotificationList } from '@/components/notifications';
 import { Button, Screen } from '@/components/ui';

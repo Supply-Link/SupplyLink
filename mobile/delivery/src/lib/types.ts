@@ -1,3 +1,6 @@
+// API response types — User, Licence, Product, Batch, Order, Quote,
+// Notification, Payment, Workspace, and AuthResponse.
+
 export type Role = 'admin' | 'distributor' | 'retailer' | 'delivery';
 
 export type OrderStatus =
