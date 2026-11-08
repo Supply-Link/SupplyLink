@@ -1,0 +1,3 @@
+1e64a3ad353d5f9cf8745ba702384c53e5da3b46c5c60eb9b9f3bb77856c57e8  SupplyLink-Android-source.zip
+a48d999f45e86f99e941dda37caea0a12f6bb1b78816e4186a16c7adcfc90045  SupplyLink-Delivery-debug.apk
+09c42e33fce669fd1039823ba95712674e8ef514c9af779fb27d1f041d8d275e  SupplyLink-Retailer-debug.apk

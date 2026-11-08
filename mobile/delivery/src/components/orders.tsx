@@ -1,3 +1,6 @@
+// Order-specific shared components: StageIcon, StageBadge, OrderCard list item,
+// Totals breakdown row group, and Timeline history list.
+
 import { useRouter } from '@/navigation/router';
 import {
   ChevronRight,

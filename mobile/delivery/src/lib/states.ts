@@ -1,3 +1,6 @@
+// Indian GST state codes — full name lookup map, sorted Select options,
+// and stateName display helper.
+
 export const STATE_NAMES: Record<string, string> = {
   '01': 'Jammu & Kashmir', '02': 'Himachal Pradesh', '03': 'Punjab', '04': 'Chandigarh',
   '05': 'Uttarakhand', '06': 'Haryana', '07': 'Delhi', '08': 'Rajasthan',

@@ -1,3 +1,6 @@
+// Home tab — active-delivery count card and quick-navigation buttons
+// to deliveries list and alerts.
+
 import { useRouter } from '@/navigation/router';
 import { Bell, LayoutGrid, RefreshCw, Truck } from 'lucide-react-native';
 import { Text, View } from 'react-native';

@@ -1,3 +1,6 @@
+// Unit tests for Api — session cookie and CSRF kept in memory,
+// cookie expiry, ApiFailure messages, non-JSON and network errors.
+
 import { Api, ApiFailure } from '../api';
 
 function reply(status: number, body: unknown, setCookie?: string) {

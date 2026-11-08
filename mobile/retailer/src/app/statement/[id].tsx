@@ -1,3 +1,6 @@
+// Statement screen — saved transaction record with supplier/buyer parties,
+// line items with batch allocations, and GST totals.
+
 import { useLocalSearchParams, useRouter } from '@/navigation/router';
 import { FileText } from 'lucide-react-native';
 import { Text } from 'react-native';
@@ -11,7 +14,13 @@ export default function StatementScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { workspace } = useSession();
   const order = workspace?.orders.find((entry) => entry.id === id);
-  if (!order) return <Screen title="Transaction record" onBack={router.back} bottomInset><EmptyState message="This order is unavailable." icon={FileText} /></Screen>;
+  if (!order) {
+    return (
+      <Screen title="Transaction record" onBack={router.back} bottomInset>
+        <EmptyState message="This order is unavailable." icon={FileText} />
+      </Screen>
+    );
+  }
   return (
     <Screen title="Transaction record" subtitle={`${order.number} · ${dateTime(order.created_at)}`} onBack={router.back} bottomInset>
       <Card className="border-brand-soft bg-brand-soft">

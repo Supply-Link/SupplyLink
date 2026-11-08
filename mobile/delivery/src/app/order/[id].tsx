@@ -1,3 +1,6 @@
+// Order detail screen — full delivery view with DeliveryActions:
+// GPS/manual location share, signature capture navigation, and cash collection.
+
 import { useLocalSearchParams, useRouter } from '@/navigation/router';
 import { Banknote, MapPin, Navigation, Package, PackageCheck, PencilLine, RefreshCw } from 'lucide-react-native';
 import { useState } from 'react';
@@ -80,7 +83,13 @@ export default function OrderScreen() {
         <Timeline history={order.history} />
       </Card>
 
-      {order.proof_of_delivery ? <Card><Title>Proof of delivery</Title><Body>Received by {order.proof_of_delivery.recipient_name}</Body><Muted>{dateTime(order.proof_of_delivery.captured_at)}</Muted></Card> : null}
+      {order.proof_of_delivery ? (
+        <Card>
+          <Title>Proof of delivery</Title>
+          <Body>Received by {order.proof_of_delivery.recipient_name}</Body>
+          <Muted>{dateTime(order.proof_of_delivery.captured_at)}</Muted>
+        </Card>
+      ) : null}
 
       {latest ? (
         <Card>

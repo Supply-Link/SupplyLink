@@ -1,3 +1,6 @@
+// Locked screen — shown when the licence is inactive;
+// offers check-activation and sign-out.
+
 import { LogOut, RefreshCw, ShieldAlert } from 'lucide-react-native';
 import { View } from 'react-native';
 import { Body, Button, Card, colors, Muted, Screen, Title } from '@/components/ui';
