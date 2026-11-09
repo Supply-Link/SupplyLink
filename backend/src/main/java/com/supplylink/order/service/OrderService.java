@@ -4,7 +4,6 @@ import com.supplylink.audit.repository.AuditRepository;
 import com.supplylink.common.BusinessException;
 import com.supplylink.notification.repository.NotificationRepository;
 import com.supplylink.order.repository.*;
-import com.supplylink.payment.repository.PaymentRepository;
 import com.supplylink.pricing.repository.PricingRepository;
 import com.supplylink.product.PharmacyHelper;
 import com.supplylink.product.repository.BatchRepository;
@@ -17,28 +16,40 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
-import static com.supplylink.auth.service.AuthService.*;
+import static com.supplylink.auth.service.AuthService.require;
+import static com.supplylink.auth.service.AuthService.text;
 
+/**
+ * Order lifecycle: quote, place, status changes, proof of delivery, returns and tracking.
+ * Statuses and money rules follow the original portal contract: placed → confirmed → packed →
+ * out_for_delivery → delivered (or cancelled), with GST computed per line in paise.
+ */
 @Service
 public class OrderService {
 
-    private final DatabaseStore               store;
-    private final OrderRepository             orders;
-    private final OrderLineRepository         lines;
+    private static final Map<String, String> NEXT_STATUS = Map.of(
+            "placed", "confirmed",
+            "confirmed", "packed",
+            "packed", "out_for_delivery",
+            "out_for_delivery", "delivered");
+
+    private final DatabaseStore                  store;
+    private final OrderRepository                orders;
+    private final OrderLineRepository            lines;
     private final OrderBatchAllocationRepository allocations;
-    private final OrderHistoryRepository      history;
-    private final OrderPartyRepository        parties;
-    private final TrackingRepository          tracking;
-    private final ProductRepository           products;
-    private final BatchRepository             batches;
-    private final PricingRepository           pricing;
-    private final UserRepository              users;
-    private final PaymentRepository           payments;
-    private final NotificationRepository      notifications;
-    private final AuditRepository             audit;
+    private final OrderHistoryRepository         history;
+    private final OrderPartyRepository           parties;
+    private final TrackingRepository             tracking;
+    private final ProductRepository              products;
+    private final BatchRepository                batches;
+    private final PricingRepository              pricing;
+    private final UserRepository                 users;
+    private final NotificationRepository         notifications;
+    private final AuditRepository                audit;
 
     @Autowired
     public OrderService(DatabaseStore store, OrderRepository orders, OrderLineRepository lines,
@@ -46,447 +57,561 @@ public class OrderService {
                         OrderPartyRepository parties, TrackingRepository tracking,
                         ProductRepository products, BatchRepository batches,
                         PricingRepository pricing, UserRepository users,
-                        PaymentRepository payments, NotificationRepository notifications,
-                        AuditRepository audit) {
+                        NotificationRepository notifications, AuditRepository audit) {
         this.store = store; this.orders = orders; this.lines = lines;
         this.allocations = allocations; this.history = history; this.parties = parties;
         this.tracking = tracking; this.products = products; this.batches = batches;
-        this.pricing = pricing; this.users = users; this.payments = payments;
+        this.pricing = pricing; this.users = users;
         this.notifications = notifications; this.audit = audit;
+    }
+
+    // ── Validation helpers ──────────────────────────────────────────────────
+
+    private static long integer(Object v, String name, long min, long max) {
+        boolean whole = v instanceof Integer || v instanceof Long || v instanceof Short
+                || (v instanceof Double d && d == Math.rint(d) && !d.isInfinite());
+        require(whole && ((Number) v).longValue() >= min && ((Number) v).longValue() <= max,
+                name + " must be an integer between " + min + " and " + max + ".");
+        return ((Number) v).longValue();
+    }
+
+    private static String stateCode(Object v) {
+        require(v instanceof String s && PharmacyHelper.STATE_CODES.contains(s),
+                "Select a valid Indian state / territory code.");
+        return (String) v;
+    }
+
+    private static String idempotencyKey(Object v) {
+        require(v instanceof String s && s.length() >= 8 && s.length() <= 120,
+                "An idempotency key is required.");
+        return (String) v;
+    }
+
+    private static String uid(String prefix) {
+        byte[] b = new byte[5];
+        new SecureRandom().nextBytes(b);
+        return prefix + "-" + HexFormat.of().formatHex(b);
+    }
+
+    private static String nowIso() { return Instant.now().toString(); }
+
+    private static boolean roleIn(Map<String, Object> user, String... roles) {
+        return Arrays.asList(roles).contains(user.get("role"));
+    }
+
+    private static void requireRole(Map<String, Object> user, String... roles) {
+        require(roleIn(user, roles), "Your role cannot perform this action.", 403);
+    }
+
+    // ── Access ──────────────────────────────────────────────────────────────
+
+    private static boolean canSee(Map<String, Object> user, Map<String, Object> order) {
+        String id = (String) user.get("id");
+        return switch ((String) user.get("role")) {
+            case "admin"       -> true;
+            case "retailer"    -> id.equals(order.get("retailer_id"));
+            case "distributor" -> id.equals(order.get("distributor_id"));
+            case "delivery"    -> id.equals(order.get("driver_id"));
+            default            -> false;
+        };
+    }
+
+    /** Loads an order the user is allowed to see (404 when missing, 403 when not theirs). */
+    public Map<String, Object> getAccessibleOrder(Map<String, Object> user, Object orderId) {
+        require(orderId instanceof String, "Record not found.", 404);
+        Map<String, Object> order = orders.findById((String) orderId)
+                .orElseThrow(() -> new BusinessException("Record not found.", 404));
+        require(canSee(user, order), "You cannot access this order.", 403);
+        return order;
+    }
+
+    // ── Stock helpers ───────────────────────────────────────────────────────
+
+    /** Recomputes a product's sellable stock from its batches (expired and quarantined excluded). */
+    private void syncStock(String productId) {
+        List<Map<String, Object>> productBatches = batches.findByProductId(productId);
+        long valid = 0;
+        for (Map<String, Object> b : productBatches) {
+            String status = PharmacyHelper.batchStatus(b);
+            if ("available".equals(status) || "near_expiry".equals(status))
+                valid += JsonbHelper.toLong(b.get("stock"));
+        }
+        products.setStock(productId, valid);
     }
 
     // ── Quote ───────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public Map<String, Object> quote(Map<String, Object> user, Map<String, Object> body) {
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> requestLines =
-                (List<Map<String, Object>>) body.getOrDefault("lines", Collections.emptyList());
-        require(!requestLines.isEmpty(), "Order must have at least one line.");
-        String buyerState = (String) user.getOrDefault("state_code", "29");
+        requireRole(user, "retailer");
+        return compute(body.get("items"), body.getOrDefault("supply_state_code",
+                user.getOrDefault("state_code", "29")));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> compute(Object itemsObj, Object supplyStateCode) {
+        require(itemsObj instanceof List<?> l && !l.isEmpty() && l.size() <= 100,
+                "Add between 1 and 100 products.");
+        List<Object> items = (List<Object>) itemsObj;
+        String destination = stateCode(supplyStateCode);
         Map<String, Object> pricingConfig = pricing.find();
-        int bulkMin = JsonbHelper.toInt(pricingConfig.getOrDefault("bulk_min", 0));
-        int bulkDiscBps = JsonbHelper.toInt(pricingConfig.getOrDefault("bulk_discount_bps", 0));
+        int bulkMin = JsonbHelper.toInt(pricingConfig.get("bulk_min"));
+        int bulkBps = JsonbHelper.toInt(pricingConfig.get("bulk_discount_bps"));
 
-        // Identify distributor (assume first product's distributor)
-        Map<String, Object> firstProduct = products.findById(text(
-                requestLines.get(0).get("product_id"), "Product ID", 50))
-                .orElseThrow(() -> new BusinessException("Product not found.", 404));
-        String supplierStateCode = "29"; // default Karnataka
-        if (firstProduct.get("distributor_id") instanceof String distId) {
-            Map<String, Object> dist = users.findById(distId).orElse(null);
-            if (dist != null && dist.get("state_code") instanceof String sc) supplierStateCode = sc;
-        }
-        boolean isUT = PharmacyHelper.UT_CODES.contains(buyerState);
-        String taxType = buyerState.equals(supplierStateCode) ? "cgst_sgst_utgst" : "igst";
+        List<Map<String, Object>> quoted = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        String distributorId = null;
+        Map<String, Object> supplier = null;
+        boolean ut = PharmacyHelper.UT_CODES.contains(destination);
 
-        List<Map<String, Object>> quotedLines = new ArrayList<>();
-        long subtotal = 0, discountTotal = 0;
+        for (Object raw : items) {
+            require(raw instanceof Map, "Invalid order line.");
+            Map<String, Object> item = (Map<String, Object>) raw;
+            Object pid = item.get("product_id");
+            require(pid instanceof String, "Record not found.", 404);
+            Map<String, Object> p = products.findById((String) pid)
+                    .orElseThrow(() -> new BusinessException("Record not found.", 404));
+            require(Boolean.TRUE.equals(p.get("active")), "This medicine is unavailable.");
+            require(seen.add((String) pid), "Combine duplicate medicines into one line.");
+            long quantity = integer(item.get("quantity"), "Quantity", 1, 10000);
 
-        for (Map<String, Object> req : requestLines) {
-            String productId = text(req.get("product_id"), "Product ID", 50);
-            Map<String, Object> product = products.findById(productId)
-                    .orElseThrow(() -> new BusinessException("Product not found.", 404));
-            int qty = JsonbHelper.toInt(req.get("quantity"));
-            require(qty > 0, "Quantity must be positive.");
-            long unitPrice = JsonbHelper.toLong(product.get("unit_price"));
-            int taxRateBps = JsonbHelper.toInt(product.getOrDefault("tax_rate_bps", 500));
-            long lineGross = unitPrice * qty;
-            long discount = lineGross >= bulkMin && bulkMin > 0
-                    ? Math.round(lineGross * bulkDiscBps / 10000.0) : 0;
-            long taxable = lineGross - discount;
-            long tax = Math.round(taxable * taxRateBps / 10000.0);
-            long lineTotal = taxable + tax;
-
-            Map<String, Object> taxBreakdown = computeTax(taxable, taxRateBps, taxType, isUT, buyerState);
-
-            Map<String, Object> ql = new LinkedHashMap<>();
-            ql.put("product_id",   productId);
-            ql.put("product_name", product.get("name"));
-            ql.put("sku",          product.get("sku"));
-            ql.put("unit",         product.get("unit"));
-            ql.put("quantity",     qty);
-            ql.put("unit_price",   unitPrice);
-            ql.put("tax_rate_bps", taxRateBps);
-            ql.put("gross",        lineGross);
-            ql.put("discount",     discount);
-            ql.put("taxable",      taxable);
-            ql.putAll(taxBreakdown);
-            ql.put("tax",          tax);
-            ql.put("total",        lineTotal);
-
-            if (Boolean.TRUE.equals(product.get("has_batches"))) {
-                List<Map<String, Object>> productBatches = batches.findByProductId(productId);
-                List<Map<String, Object>> allocBatches = fefoAllocate(productBatches, qty);
-                ql.put("batch_allocations", allocBatches);
+            List<Map<String, Object>> productBatches = new ArrayList<>(batches.findByProductId((String) pid));
+            long sellable = 0;
+            for (Map<String, Object> b : productBatches) {
+                String status = PharmacyHelper.batchStatus(b);
+                if ("available".equals(status) || "near_expiry".equals(status))
+                    sellable += JsonbHelper.toLong(b.get("stock"));
             }
+            require(quantity <= sellable,
+                    p.get("name") + " has only " + sellable + " unexpired packs available.", 409);
+            require(p.get("hsn_code") instanceof String h && !h.isEmpty() && p.get("gst_rate_bps") != null,
+                    "Configure HSN and GST for " + p.get("name") + " before ordering.", 409);
 
-            quotedLines.add(ql);
-            subtotal += lineGross;
-            discountTotal += discount;
+            if (distributorId == null) {
+                distributorId = (String) p.get("distributor_id");
+                supplier = users.findById(distributorId)
+                        .orElseThrow(() -> new BusinessException("Record not found.", 404));
+                require(Boolean.TRUE.equals(supplier.get("active")), "This distributor is inactive.", 409);
+                stateCode(supplier.get("state_code"));
+            }
+            require(distributorId.equals(p.get("distributor_id")),
+                    "Place a separate order for each distributor.");
+
+            long price = JsonbHelper.toLong(p.get("price"));
+            int rate = JsonbHelper.toInt(p.get("gst_rate_bps"));
+            long discountBps = quantity >= bulkMin ? bulkBps : 0;
+            long subtotal = price * quantity;
+            long reduction = subtotal * discountBps / 10000;
+            long taxable = subtotal - reduction;
+            boolean intra = destination.equals(supplier.get("state_code"));
+            long cgst  = intra ? (taxable * rate + 10000) / 20000 : 0;
+            long utgst = intra && ut ? cgst : 0;
+            long sgst  = intra && utgst == 0 ? cgst : 0;
+            long igst  = intra ? 0 : (taxable * rate + 5000) / 10000;
+
+            productBatches.sort(Comparator
+                    .comparing((Map<String, Object> b) -> String.valueOf(b.get("expiry_date")))
+                    .thenComparing(b -> String.valueOf(b.get("manufacturing_date")))
+                    .thenComparing(b -> String.valueOf(b.get("id"))));
+            long remaining = quantity;
+            List<Map<String, Object>> allocs = new ArrayList<>();
+            for (Map<String, Object> b : productBatches) {
+                String status = PharmacyHelper.batchStatus(b);
+                if (!"available".equals(status) && !"near_expiry".equals(status)) continue;
+                long take = Math.min(remaining, JsonbHelper.toLong(b.get("stock")));
+                if (take > 0) {
+                    require(price * (10000L + rate) <= JsonbHelper.toLong(b.get("mrp")) * 10000L,
+                            "Selling price including GST exceeds MRP for batch " + b.get("batch_number") + ".", 409);
+                    Map<String, Object> a = new LinkedHashMap<>();
+                    a.put("batch_id",           b.get("id"));
+                    a.put("batch_number",       b.get("batch_number"));
+                    a.put("manufacturing_date", b.get("manufacturing_date"));
+                    a.put("expiry_date",        b.get("expiry_date"));
+                    a.put("mrp",                JsonbHelper.toLong(b.get("mrp")));
+                    a.put("quantity",           take);
+                    allocs.add(a);
+                    remaining -= take;
+                }
+                if (remaining == 0) break;
+            }
+            require(remaining == 0, "Receive batch stock before ordering this medicine.", 409);
+
+            long tax = cgst + sgst + utgst + igst;
+            Map<String, Object> line = new LinkedHashMap<>();
+            line.put("product_id",   pid);
+            line.put("name",         p.get("name"));
+            line.put("unit",         p.get("unit"));
+            line.put("manufacturer", p.get("manufacturer") == null ? "" : p.get("manufacturer"));
+            line.put("quantity",     quantity);
+            line.put("unit_price",   price);
+            line.put("subtotal",     subtotal);
+            line.put("discount",     reduction);
+            line.put("taxable",      taxable);
+            line.put("hsn_code",     p.get("hsn_code"));
+            line.put("gst_rate_bps", rate);
+            line.put("cgst",  cgst);
+            line.put("sgst",  sgst);
+            line.put("utgst", utgst);
+            line.put("igst",  igst);
+            line.put("tax",   tax);
+            line.put("total", taxable + tax);
+            line.put("batches", allocs);
+            quoted.add(line);
         }
-
-        long taxableTotal = subtotal - discountTotal;
-        long totalTax = quotedLines.stream().mapToLong(l -> JsonbHelper.toLong(l.getOrDefault("tax",0))).sum();
-        Map<String, Object> taxBreakdownTotal = computeTax(taxableTotal,
-                quotedLines.isEmpty() ? 500 : JsonbHelper.toInt(quotedLines.get(0).getOrDefault("tax_rate_bps",500)),
-                taxType, isUT, buyerState);
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tax_type",           taxType);
-        result.put("supply_state_code",  buyerState);
-        result.put("supplier_state_code",supplierStateCode);
-        result.put("subtotal",           subtotal);
-        result.put("discount",           discountTotal);
-        result.put("taxable",            taxableTotal);
-        result.putAll(taxBreakdownTotal);
-        result.put("tax",                totalTax);
-        result.put("total",              taxableTotal + totalTax);
-        result.put("lines",              quotedLines);
+        for (String field : new String[]{"subtotal", "discount", "taxable", "cgst", "sgst", "utgst", "igst", "tax", "total"}) {
+            long sum = 0;
+            for (Map<String, Object> l : quoted) sum += JsonbHelper.toLong(l.get(field));
+            result.put(field, sum);
+        }
+        String supplierState = (String) supplier.get("state_code");
+        result.put("lines",               quoted);
+        result.put("distributor_id",      distributorId);
+        result.put("supply_state_code",   destination);
+        result.put("supplier_state_code", supplierState);
+        result.put("tax_type", supplierState.equals(destination) ? (ut ? "CGST + UTGST" : "CGST + SGST") : "IGST");
         return result;
     }
 
-    // ── Create Order ────────────────────────────────────────────────────────
+    // ── Create order ────────────────────────────────────────────────────────
 
     @Transactional
+    @SuppressWarnings("unchecked")
     public Map<String, Object> createOrder(Map<String, Object> user, Map<String, Object> body) {
         store.acquireAdvisoryLock();
-        require("retailer".equals(user.get("role")), "Only retailers can place orders.", 403);
-        String requestKey = text(body.get("request_key"), "Request key", 100);
-        var existing = orders.findByRetailerAndKey((String) user.get("id"), requestKey);
+        requireRole(user, "retailer");
+        String key = idempotencyKey(body.get("request_key"));
+        var existing = orders.findByRetailerAndKey((String) user.get("id"), key);
         if (existing.isPresent()) return buildFullOrder(existing.get());
 
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> requestLines =
-                (List<Map<String, Object>>) body.getOrDefault("lines", Collections.emptyList());
-        require(!requestLines.isEmpty(), "Order must have at least one line.");
-        Map<String, Object> quoteResult = quote(user, body);
+        Map<String, Object> calc = compute(body.get("items"),
+                body.getOrDefault("supply_state_code", user.getOrDefault("state_code", "29")));
+        long total = JsonbHelper.toLong(calc.get("total"));
+        if (body.containsKey("expected_total"))
+            require(body.get("expected_total") instanceof Number n && n.longValue() == total,
+                    "The order total has changed. Reopen your basket to review current prices and GST.", 409);
+        String address = text(body.getOrDefault("address", user.get("address")), "Delivery address", 500);
+        Object method = body.getOrDefault("payment_method", "cod");
+        require("cod".equals(method) || "credit".equals(method), "Choose cash on delivery or trade credit.");
 
-        // Find distributor
-        String productId0 = text(requestLines.get(0).get("product_id"), "Product ID", 50);
-        Map<String, Object> prod0 = products.findById(productId0).orElseThrow();
-        String distributorId = (String) prod0.get("distributor_id");
-        Map<String, Object> distributor = distributorId != null
-                ? users.findById(distributorId).orElse(null) : null;
-        require(distributor != null, "No distributor found for this product.");
+        // Re-read the buyer inside the lock so credit checks use the freshest balance.
+        Map<String, Object> buyer = users.findById((String) user.get("id")).orElse(user);
+        if ("credit".equals(method)) {
+            long limit = JsonbHelper.toLong(buyer.get("credit_limit"));
+            long used  = JsonbHelper.toLong(buyer.get("credit_used"));
+            require(total <= limit - used, "Insufficient trade credit.", 409);
+            users.updateCreditUsed((String) buyer.get("id"), used + total);
+        }
 
-        // Credit check
-        long total = JsonbHelper.toLong(quoteResult.get("total"));
-        long creditLimit = JsonbHelper.toLong(user.getOrDefault("credit_limit", 0));
-        long creditUsed  = JsonbHelper.toLong(user.getOrDefault("credit_used",  0));
-        String paymentMethod = (String) body.getOrDefault("payment_method", "credit");
-        if ("credit".equals(paymentMethod))
-            require(creditUsed + total <= creditLimit,
-                    "Insufficient trade credit. Available: ₹" + (creditLimit - creditUsed) / 100.0);
+        List<Map<String, Object>> quotedLines = (List<Map<String, Object>>) calc.get("lines");
+        for (Map<String, Object> line : quotedLines) {
+            for (Map<String, Object> a : (List<Map<String, Object>>) line.get("batches"))
+                batches.adjustStock((String) a.get("batch_id"), -JsonbHelper.toLong(a.get("quantity")));
+            syncStock((String) line.get("product_id"));
+        }
 
-        long orderNum = orders.countAll() + 1;
+        String distributorId = (String) calc.get("distributor_id");
+        Map<String, Object> distributor = users.findById(distributorId).orElseThrow();
+        String orderId = uid("ord");
         Map<String, Object> order = new LinkedHashMap<>();
-        order.put("id",                   uid("ord"));
-        order.put("number",               orderNum);
-        order.put("retailer_id",          user.get("id"));
-        order.put("retailer_name",        user.get("business"));
-        order.put("distributor_id",       distributorId);
-        order.put("address",              user.get("address"));
-        order.put("payment_method",       paymentMethod);
-        order.put("status",               "pending");
-        order.put("request_key",          requestKey);
-        order.put("supply_state_code",    quoteResult.get("supply_state_code"));
-        order.put("supplier_state_code",  quoteResult.get("supplier_state_code"));
-        order.put("tax_type",             quoteResult.get("tax_type"));
-        order.put("subtotal",             quoteResult.get("subtotal"));
-        order.put("discount",             quoteResult.get("discount"));
-        order.put("taxable",              quoteResult.get("taxable"));
-        order.put("cgst",   quoteResult.getOrDefault("cgst",   0L));
-        order.put("sgst",   quoteResult.getOrDefault("sgst",   0L));
-        order.put("utgst",  quoteResult.getOrDefault("utgst",  0L));
-        order.put("igst",   quoteResult.getOrDefault("igst",   0L));
-        order.put("tax",    quoteResult.get("tax"));
-        order.put("total",  total);
+        order.put("id",                  orderId);
+        order.put("number",              String.format("SL-%05d", orders.countAll() + 1001));
+        order.put("retailer_id",         buyer.get("id"));
+        order.put("retailer_name",       buyer.get("business"));
+        order.put("distributor_id",      distributorId);
+        order.put("driver_id",           null);
+        order.put("address",             address);
+        order.put("payment_method",      method);
+        order.put("status",              "placed");
+        order.put("request_key",         key);
+        order.put("supply_state_code",   calc.get("supply_state_code"));
+        order.put("supplier_state_code", calc.get("supplier_state_code"));
+        order.put("tax_type",            calc.get("tax_type"));
+        for (String f : new String[]{"subtotal", "discount", "taxable", "cgst", "sgst", "utgst", "igst", "tax", "total"})
+            order.put(f, calc.get(f));
+        orders.insert(order, orders.nextSortOrder());
+        lines.insertAll(orderId, quotedLines);
+        allocations.insertAll(orderId, quotedLines);
+        history.insert(orderId, "placed", (String) buyer.get("name"));
+        parties.insertBoth(orderId, UserRepository.businessSnapshot(distributor),
+                UserRepository.businessSnapshot(buyer));
 
-        int sortOrder = orders.nextSortOrder();
-        orders.insert(order, sortOrder);
-
-        // Insert lines and batch allocations
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> quotedLines = (List<Map<String, Object>>) quoteResult.get("lines");
-        lines.insertAll((String) order.get("id"), quotedLines);
-        allocations.insertAll((String) order.get("id"), quotedLines);
-
-        // Deduct stock (batch-tracked)
-        for (Map<String, Object> ql : quotedLines) {
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> allocBatches =
-                    (List<Map<String, Object>>) ql.getOrDefault("batch_allocations", Collections.emptyList());
-            for (Map<String, Object> ab : allocBatches) {
-                String batchId = (String) ab.get("batch_id");
-                int used = JsonbHelper.toInt(ab.get("quantity"));
-                if (batchId != null) batches.adjustStock(batchId, -used);
-            }
-            if (allocBatches.isEmpty()) {
-                int qty = JsonbHelper.toInt(ql.get("quantity"));
-                products.adjustStock((String) ql.get("product_id"), -qty);
-            }
-        }
-
-        // Record initial history
-        history.insert((String) order.get("id"), "pending", (String) user.get("name"));
-        // Parties snapshot
-        parties.insertBoth((String) order.get("id"),
-                UserRepository.businessSnapshot(distributor),
-                UserRepository.businessSnapshot(user));
-
-        // Increase credit_used for credit orders
-        if ("credit".equals(paymentMethod)) {
-            long currentUsed = JsonbHelper.toLong(user.getOrDefault("credit_used", 0));
-            updateCreditUsed((String) user.get("id"), currentUsed + total);
-        }
-
-        // Notify distributor
-        notifications.insert(distributorId, "New order received",
-                "Order #" + orderNum + " from " + user.get("business"));
-        audit.insert((String) user.get("id"), (String) user.get("name"),
-                "Order placed", "Order #" + orderNum);
-
-        return buildFullOrder(orders.findById((String) order.get("id")).orElseThrow());
+        notifications.insert(distributorId, "New order " + order.get("number"),
+                buyer.get("business") + " placed an order.");
+        audit.insert((String) buyer.get("id"), (String) buyer.get("name"), "Order placed",
+                (String) order.get("number"));
+        return buildFullOrder(orders.findById(orderId).orElseThrow());
     }
 
-    // ── Update Order ────────────────────────────────────────────────────────
+    // ── Update order (cancel / advance status) ──────────────────────────────
 
     @Transactional
     public Map<String, Object> updateOrder(Map<String, Object> actor, Map<String, Object> body) {
         store.acquireAdvisoryLock();
-        String orderId = text(body.get("order_id"), "Order ID", 50);
-        Map<String, Object> order = orders.findById(orderId)
-                .orElseThrow(() -> new BusinessException("Order not found.", 404));
-        String newStatus = text(body.get("status"), "Status", 30);
-        String role = (String) actor.get("role");
-        String currentStatus = (String) order.get("status");
-        validateTransition(role, currentStatus, newStatus, actor, order);
+        Map<String, Object> order = getAccessibleOrder(actor, body.get("order_id"));
+        Object target = body.get("status");
+        require(target instanceof String, "Invalid order status transition.", 409);
+        String to = (String) target;
+        String current = (String) order.get("status");
+        String orderId = (String) order.get("id");
 
-        if ("dispatched".equals(newStatus) && body.get("driver_id") instanceof String driverId) {
-            orders.updateStatusAndDriver(orderId, newStatus, driverId);
+        if ("cancelled".equals(to)) {
+            requireRole(actor, "admin", "retailer", "distributor");
+            require("placed".equals(current) || "confirmed".equals(current)
+                            || ("packed".equals(current) && roleIn(actor, "admin", "distributor")),
+                    "This order can no longer be cancelled by your role.", 409);
+            require("unpaid".equals(order.get("payment_status")),
+                    "Paid orders require a refund workflow and cannot be cancelled here.", 409);
+            restoreStock(orderId);
+            if ("credit".equals(order.get("payment_method")))
+                users.findById((String) order.get("retailer_id")).ifPresent(r -> users.updateCreditUsed(
+                        (String) r.get("id"),
+                        Math.max(0, JsonbHelper.toLong(r.get("credit_used")) - JsonbHelper.toLong(order.get("total")))));
+            orders.updateStatus(orderId, "cancelled");
         } else {
-            orders.updateStatus(orderId, newStatus);
+            require(to.equals(NEXT_STATUS.get(current)), "Invalid order status transition.", 409);
+            if ("delivered".equals(to)) requireRole(actor, "admin", "delivery");
+            else requireRole(actor, "admin", "distributor");
+            String driverId = null;
+            if ("confirmed".equals(to) || "packed".equals(to) || "out_for_delivery".equals(to))
+                checkReservedBatches(orderId);
+            if ("out_for_delivery".equals(to)) {
+                Object d = body.get("driver_id");
+                require(d instanceof String, "Record not found.", 404);
+                Map<String, Object> driver = users.findById((String) d)
+                        .orElseThrow(() -> new BusinessException("Record not found.", 404));
+                require("delivery".equals(driver.get("role")) && Boolean.TRUE.equals(driver.get("active")),
+                        "Select an active delivery partner.");
+                driverId = (String) driver.get("id");
+                notifications.insert(driverId, "Delivery assigned", order.get("number") + " is ready for pickup.");
+            }
+            if (driverId != null) orders.updateStatusAndDriver(orderId, to, driverId);
+            else orders.updateStatus(orderId, to);
         }
-        history.insert(orderId, newStatus, (String) actor.get("name"));
+        history.insert(orderId, to, (String) actor.get("name"));
+        notifications.insert((String) order.get("retailer_id"), order.get("number") + " updated",
+                "Your order is " + to.replace('_', ' ') + ".");
+        String pretty = to.replace('_', ' ');
+        audit.insert((String) actor.get("id"), (String) actor.get("name"), "Order " + pretty,
+                (String) order.get("number"));
+        return buildFullOrder(orders.findById(orderId).orElseThrow());
+    }
 
-        // On delivery confirm or cancellation, reduce credit_used
-        if ("delivered".equals(newStatus) || "cancelled".equals(newStatus)) {
-            String retailerId = (String) order.get("retailer_id");
-            if ("credit".equals(order.get("payment_method"))) {
-                users.findById(retailerId).ifPresent(r -> {
-                    long used  = JsonbHelper.toLong(r.getOrDefault("credit_used", 0));
-                    long total2 = JsonbHelper.toLong(order.get("total"));
-                    updateCreditUsed(retailerId, Math.max(0, used - total2));
+    private void restoreStock(String orderId) {
+        List<Map<String, Object>> orderLines = lines.findByOrderId(orderId);
+        Map<Integer, List<Map<String, Object>>> byLine = new HashMap<>();
+        for (Map<String, Object> a : allocations.findByOrderId(orderId))
+            byLine.computeIfAbsent(JsonbHelper.toInt(a.get("_line_number")), k -> new ArrayList<>()).add(a);
+        for (Map<String, Object> line : orderLines) {
+            String productId = (String) line.get("product_id");
+            List<Map<String, Object>> allocs = byLine.getOrDefault(JsonbHelper.toInt(line.get("_line_number")), List.of());
+            if (!allocs.isEmpty()) {
+                for (Map<String, Object> a : allocs)
+                    batches.adjustStock((String) a.get("batch_id"), JsonbHelper.toLong(a.get("quantity")));
+                syncStock(productId);
+            } else {
+                products.addUnallocated(productId, JsonbHelper.toLong(line.get("quantity")));
+                syncStock(productId);
+            }
+        }
+    }
+
+    private void checkReservedBatches(String orderId) {
+        LocalDate today = PharmacyHelper.today();
+        for (Map<String, Object> a : allocations.findByOrderId(orderId)) {
+            Object bid = a.get("batch_id");
+            String number = String.valueOf(a.get("batch_number"));
+            Object exp = a.get("expiry_date");
+            require(exp == null || !LocalDate.parse(exp.toString()).isBefore(today),
+                    "Reserved batch " + number + " has expired. Cancel and replace this order.", 409);
+            if (bid instanceof String id) {
+                batches.findById(id).ifPresent(b -> {
+                    require(!"expired".equals(PharmacyHelper.batchStatus(b)),
+                            "Reserved batch " + number + " has expired.", 409);
+                    require(!Boolean.TRUE.equals(b.get("quarantined")),
+                            "Reserved batch " + number + " is quarantined.", 409);
                 });
             }
         }
-        // Notify retailer on status change
-        String retailerId = (String) order.get("retailer_id");
-        notifications.insert(retailerId, "Order status updated",
-                "Order #" + order.get("number") + " is now " + newStatus);
-        audit.insert((String) actor.get("id"), (String) actor.get("name"),
-                "Order updated", "Order #" + order.get("number") + " → " + newStatus);
-        return buildFullOrder(orders.findById(orderId).orElseThrow());
     }
 
     // ── Proof of delivery ───────────────────────────────────────────────────
 
     @Transactional
+    @SuppressWarnings("unchecked")
     public Map<String, Object> captureProofOfDelivery(Map<String, Object> actor, Map<String, Object> body) {
         store.acquireAdvisoryLock();
-        require("delivery".equals(actor.get("role")) || "admin".equals(actor.get("role")),
-                "Your role cannot perform this action.", 403);
-        String orderId = text(body.get("order_id"), "Order ID", 50);
-        Map<String, Object> order = orders.findById(orderId)
-                .orElseThrow(() -> new BusinessException("Order not found.", 404));
-        require("dispatched".equals(order.get("status")), "Order must be in dispatched state.");
-        Map<String, Object> extra = new LinkedHashMap<>();
-        extra.put("proof_of_delivery", Map.of(
-                "captured_by", actor.get("name"),
-                "captured_at", java.time.Instant.now().toString(),
-                "notes",       body.getOrDefault("notes", "")));
-        orders.updateExtra(orderId, extra);
-        orders.updateStatus(orderId, "delivered");
-        history.insert(orderId, "delivered", (String) actor.get("name"));
-        notifications.insert((String) order.get("retailer_id"), "Order delivered",
-                "Order #" + order.get("number") + " has been delivered.");
+        requireRole(actor, "delivery");
+        Map<String, Object> order = getAccessibleOrder(actor, body.get("order_id"));
+        String key = idempotencyKey(body.get("request_key"));
+        Object existing = order.get("proof_of_delivery");
+        if (existing instanceof Map<?, ?> proof) {
+            require(key.equals(proof.get("request_key")), "Proof of delivery is already recorded.", 409);
+            return (Map<String, Object>) existing;
+        }
+        require("out_for_delivery".equals(order.get("status")), "Proof requires an active delivery.", 409);
+        String recipient = text(body.get("recipient_name"), "Recipient name", 100);
+        Object strokes = body.get("signature");
+        require(strokes instanceof List<?> sl && !sl.isEmpty() && sl.size() <= 20, "Draw a recipient signature.");
+        int points = 0;
+        for (Object stroke : (List<?>) strokes) {
+            require(stroke instanceof List<?> st && st.size() >= 2 && st.size() <= 200, "Signature stroke is invalid.");
+            for (Object pt : (List<?>) stroke) {
+                require(pt instanceof List<?> xy && xy.size() == 2
+                                && xy.get(0) instanceof Integer && xy.get(1) instanceof Integer
+                                && ((Integer) xy.get(0)) >= 0 && ((Integer) xy.get(0)) <= 1000
+                                && ((Integer) xy.get(1)) >= 0 && ((Integer) xy.get(1)) <= 1000,
+                        "Signature coordinates are invalid.");
+                points++;
+            }
+        }
+        require(points >= 4 && points <= 1500, "Draw a complete recipient signature.");
+
+        Map<String, Object> proof = new LinkedHashMap<>();
+        proof.put("recipient_name", recipient);
+        proof.put("signature",      strokes);
+        proof.put("captured_at",    nowIso());
+        proof.put("captured_by",    actor.get("id"));
+        proof.put("request_key",    key);
+        orders.mergeExtra((String) order.get("id"), Map.of("proof_of_delivery", proof));
+
+        Map<String, Object> change = new LinkedHashMap<>();
+        change.put("order_id", order.get("id"));
+        change.put("status", "delivered");
+        updateOrder(actor, change);
         audit.insert((String) actor.get("id"), (String) actor.get("name"),
-                "Delivery confirmed", "Order #" + order.get("number"));
-        return buildFullOrder(orders.findById(orderId).orElseThrow());
+                "Proof of delivery recorded", (String) order.get("number"));
+        return proof;
     }
 
-    // ── Return request ──────────────────────────────────────────────────────
+    // ── Returns ─────────────────────────────────────────────────────────────
 
     @Transactional
+    @SuppressWarnings("unchecked")
     public Map<String, Object> manageReturn(Map<String, Object> actor, Map<String, Object> body) {
         store.acquireAdvisoryLock();
-        String orderId = text(body.get("order_id"), "Order ID", 50);
-        Map<String, Object> order = orders.findById(orderId)
-                .orElseThrow(() -> new BusinessException("Order not found.", 404));
-        String role = (String) actor.get("role");
-        String action = (String) body.getOrDefault("action", "request");
-        Map<String, Object> extra = new LinkedHashMap<>();
+        Map<String, Object> order = getAccessibleOrder(actor, body.get("order_id"));
+        String orderId = (String) order.get("id");
+        Object action = body.get("action");
         if ("request".equals(action)) {
-            require("retailer".equals(role) && actor.get("id").equals(order.get("retailer_id")),
-                    "Only the ordering retailer can request a return.", 403);
-            require("delivered".equals(order.get("status")), "Returns are only allowed for delivered orders.");
-            extra.put("return_request", Map.of(
-                    "requested_by", actor.get("name"),
-                    "requested_at", java.time.Instant.now().toString(),
-                    "reason",       body.getOrDefault("reason", ""),
-                    "status",       "pending"));
-        } else if ("approve".equals(action) || "reject".equals(action)) {
-            require("admin".equals(role) || "distributor".equals(role),
-                    "Your role cannot perform this action.", 403);
-            extra.put("return_request", Map.of(
-                    "decision",    action,
-                    "decided_by",  actor.get("name"),
-                    "decided_at",  java.time.Instant.now().toString(),
-                    "status",      action.equals("approve") ? "approved" : "rejected"));
-            if ("approve".equals(action)) orders.updateStatus(orderId, "returned");
-        } else require(false, "Invalid action.");
-        orders.updateExtra(orderId, extra);
-        return buildFullOrder(orders.findById(orderId).orElseThrow());
+            requireRole(actor, "retailer");
+            require("delivered".equals(order.get("status")), "Request a return after delivery.", 409);
+            String key = idempotencyKey(body.get("request_key"));
+            Object existing = order.get("return_request");
+            if (existing instanceof Map<?, ?> rr) {
+                require(key.equals(rr.get("request_key")), "A return request already exists for this order.", 409);
+                return (Map<String, Object>) existing;
+            }
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("id",           uid("ret"));
+            result.put("order_id",     orderId);
+            result.put("status",       "requested");
+            result.put("reason",       text(body.get("reason"), "Return reason", 500));
+            result.put("requested_at", nowIso());
+            result.put("requested_by", actor.get("id"));
+            result.put("request_key",  key);
+            orders.mergeExtra(orderId, Map.of("return_request", result));
+            notifications.insert((String) order.get("distributor_id"), "Return requested",
+                    order.get("number") + ": review the retailer request.");
+            audit.insert((String) actor.get("id"), (String) actor.get("name"), "Return requested",
+                    (String) order.get("number"));
+            return result;
+        }
+        require("approve".equals(action) || "reject".equals(action), "Choose a valid return action.");
+        requireRole(actor, "admin", "distributor");
+        Object current = order.get("return_request");
+        require(current instanceof Map, "No return request exists.", 404);
+        Map<String, Object> result = new LinkedHashMap<>((Map<String, Object>) current);
+        require("requested".equals(result.get("status")), "This return request is already reviewed.", 409);
+        result.put("status",      "approve".equals(action) ? "approved" : "rejected");
+        result.put("review_note", text(body.get("review_note"), "Review note", 500));
+        result.put("reviewed_at", nowIso());
+        result.put("reviewed_by", actor.get("id"));
+        orders.mergeExtra(orderId, Map.of("return_request", result));
+        notifications.insert((String) order.get("retailer_id"), "Return request " + result.get("status"),
+                order.get("number") + ": " + result.get("review_note"));
+        audit.insert((String) actor.get("id"), (String) actor.get("name"),
+                "Return request " + result.get("status"), (String) order.get("number"));
+        return result;
     }
 
-    // ── Tracking ─────────────────────────────────────────────────────────
+    // ── Tracking ────────────────────────────────────────────────────────────
 
     @Transactional
     public Map<String, Object> addTrackingPoint(Map<String, Object> actor, Map<String, Object> body) {
         store.acquireAdvisoryLock();
-        require("delivery".equals(actor.get("role")) || "admin".equals(actor.get("role")),
-                "Your role cannot perform this action.", 403);
-        String orderId = text(body.get("order_id"), "Order ID", 50);
-        require(orders.findById(orderId).isPresent(), "Order not found.", 404);
-        double lat = ((Number) body.get("latitude")).doubleValue();
-        double lon = ((Number) body.get("longitude")).doubleValue();
-        tracking.insert(orderId, lat, lon);
-        return Map.of("ok", true);
+        requireRole(actor, "delivery");
+        Map<String, Object> order = getAccessibleOrder(actor, body.get("order_id"));
+        require("out_for_delivery".equals(order.get("status")),
+                "Location updates require an active delivery.", 409);
+        Object lat = body.get("latitude"), lng = body.get("longitude");
+        require(lat instanceof Number a && lng instanceof Number b
+                        && a.doubleValue() >= -90 && a.doubleValue() <= 90
+                        && b.doubleValue() >= -180 && b.doubleValue() <= 180,
+                "Invalid coordinates.");
+        tracking.insert((String) order.get("id"), ((Number) lat).doubleValue(), ((Number) lng).doubleValue());
+        Map<String, Object> point = new LinkedHashMap<>();
+        point.put("latitude",  lat);
+        point.put("longitude", lng);
+        point.put("at",        nowIso());
+        return point;
     }
 
-    // ── Get Orders for user ───────────────────────────────────────────────
+    // ── Reads ───────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getOrdersForUser(Map<String, Object> user) {
         String role = (String) user.get("role");
-        List<Map<String, Object>> orderList = switch (role) {
+        List<Map<String, Object>> list = switch (role) {
             case "admin"       -> orders.findAll();
             case "distributor" -> orders.findByDistributorId((String) user.get("id"));
             case "retailer"    -> orders.findByRetailerId((String) user.get("id"));
             case "delivery"    -> orders.findByDriverId((String) user.get("id"));
             default            -> Collections.emptyList();
         };
-        if (orderList.isEmpty()) return orderList;
-        List<String> ids = orderList.stream().map(o -> (String) o.get("id")).toList();
-        Map<String, List<Map<String, Object>>> linesMap   = lines.findByOrderIds(ids);
-        Map<String, List<Map<String, Object>>> histMap    = history.findByOrderIds(ids);
-        Map<String, List<Map<String, Object>>> trackMap   = tracking.findByOrderIds(ids);
-        for (Map<String, Object> o : orderList) {
-            String id = (String) o.get("id");
-            ((List<Map<String, Object>>) o.get("lines")).addAll(linesMap.getOrDefault(id, Collections.emptyList()));
-            ((List<Map<String, Object>>) o.get("history")).addAll(histMap.getOrDefault(id, Collections.emptyList()));
-            ((List<Map<String, Object>>) o.get("tracking")).addAll(trackMap.getOrDefault(id, Collections.emptyList()));
-        }
-        return orderList;
+        return hydrate(list);
     }
 
-    // ── Build a single full order ──────────────────────────────────────────
-
     public Map<String, Object> buildFullOrder(Map<String, Object> order) {
-        String id = (String) order.get("id");
-        ((List<?>) order.get("lines")).clear();
-        ((List<?>) order.get("history")).clear();
-        ((List<?>) order.get("tracking")).clear();
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> linesData   = lines.findByOrderId(id);
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> histData    = history.findByOrderId(id);
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> trackData   = tracking.findByOrderId(id);
-        ((List<Map<String, Object>>) order.get("lines")).addAll(linesData);
-        ((List<Map<String, Object>>) order.get("history")).addAll(histData);
-        ((List<Map<String, Object>>) order.get("tracking")).addAll(trackData);
+        hydrate(List.of(order));
         return order;
     }
 
-    // ── FEFO allocation ────────────────────────────────────────────────────
-
-    private List<Map<String, Object>> fefoAllocate(List<Map<String, Object>> productBatches, int qty) {
-        String today = PharmacyHelper.today().toString();
-        List<Map<String, Object>> available = productBatches.stream()
-                .filter(b -> !Boolean.TRUE.equals(b.get("quarantined")))
-                .filter(b -> {
-                    Object exp = b.get("expiry_date");
-                    if (exp == null) return false;
-                    String expStr = exp.toString();
-                    return expStr.compareTo(today) > 0;
-                })
-                .filter(b -> JsonbHelper.toInt(b.getOrDefault("stock", 0)) > 0)
-                .sorted(Comparator.comparing(b -> b.get("expiry_date").toString()))
-                .toList();
-        List<Map<String, Object>> result = new ArrayList<>();
-        int remaining = qty;
-        for (Map<String, Object> b : available) {
-            if (remaining <= 0) break;
-            int stock = JsonbHelper.toInt(b.getOrDefault("stock", 0));
-            int used  = Math.min(stock, remaining);
-            Map<String, Object> alloc = new LinkedHashMap<>();
-            alloc.put("batch_id",     b.get("id"));
-            alloc.put("batch_number", b.get("batch_number"));
-            alloc.put("expiry_date",  b.get("expiry_date"));
-            alloc.put("quantity",     used);
-            result.add(alloc);
-            remaining -= used;
+    /** Fills lines (with their batch allocations), history, tracking and the supplier/buyer snapshots. */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> hydrate(List<Map<String, Object>> orderList) {
+        if (orderList.isEmpty()) return orderList;
+        List<String> ids = orderList.stream().map(o -> (String) o.get("id")).toList();
+        Map<String, List<Map<String, Object>>> lineMap  = lines.findByOrderIds(ids);
+        Map<String, List<Map<String, Object>>> allocMap = allocations.findByOrderIds(ids);
+        Map<String, List<Map<String, Object>>> histMap  = history.findByOrderIds(ids);
+        Map<String, List<Map<String, Object>>> trackMap = tracking.findByOrderIds(ids);
+        Map<String, Map<String, Map<String, Object>>> partyMap = parties.findByOrderIds(ids);
+        for (Map<String, Object> o : orderList) {
+            String id = (String) o.get("id");
+            List<Map<String, Object>> orderLines = new ArrayList<>();
+            List<Map<String, Object>> orderAllocs = allocMap.getOrDefault(id, List.of());
+            for (Map<String, Object> line : lineMap.getOrDefault(id, List.of())) {
+                int ln = JsonbHelper.toInt(line.remove("_line_number"));
+                List<Map<String, Object>> mine = new ArrayList<>();
+                for (Map<String, Object> a : orderAllocs) {
+                    if (JsonbHelper.toInt(a.get("_line_number")) == ln) {
+                        Map<String, Object> copy = new LinkedHashMap<>(a);
+                        copy.remove("_line_number");
+                        mine.add(copy);
+                    }
+                }
+                line.put("batches", mine);
+                orderLines.add(line);
+            }
+            o.put("lines",    orderLines);
+            o.put("history",  new ArrayList<>(histMap.getOrDefault(id, List.of())));
+            o.put("tracking", new ArrayList<>(trackMap.getOrDefault(id, List.of())));
+            Map<String, Map<String, Object>> ps = partyMap.getOrDefault(id, Map.of());
+            if (ps.get("supplier") != null) o.put("supplier", ps.get("supplier"));
+            if (ps.get("buyer")    != null) o.put("buyer",    ps.get("buyer"));
         }
-        return result;
+        return orderList;
     }
-
-    // ── Tax calculation ────────────────────────────────────────────────────
-
-    private Map<String, Object> computeTax(long taxable, int taxRateBps, String taxType,
-                                           boolean isUT, String buyerState) {
-        Map<String, Object> r = new LinkedHashMap<>();
-        r.put("cgst", 0L); r.put("sgst", 0L); r.put("utgst", 0L); r.put("igst", 0L);
-        if ("igst".equals(taxType)) {
-            r.put("igst", Math.round(taxable * taxRateBps / 10000.0));
-        } else {
-            long halfTax = Math.round(taxable * taxRateBps / 20000.0);
-            r.put("cgst", halfTax);
-            if (isUT) r.put("utgst", halfTax);
-            else      r.put("sgst",  halfTax);
-        }
-        return r;
-    }
-
-    private void validateTransition(String role, String from, String to,
-                                    Map<String, Object> actor, Map<String, Object> order) {
-        Map<String, List<String>> allowed = Map.of(
-                "admin",       List.of("pending","confirmed","dispatched","delivered","cancelled","returned"),
-                "distributor", List.of("pending","confirmed","dispatched","cancelled"),
-                "delivery",    List.of("dispatched","delivered"),
-                "retailer",    List.of("cancelled")
-        );
-        require(allowed.getOrDefault(role, Collections.emptyList()).contains(to),
-                "Your role cannot set this status.", 403);
-        Map<String, List<String>> transitions = Map.of(
-                "pending",    List.of("confirmed","cancelled"),
-                "confirmed",  List.of("dispatched","cancelled"),
-                "dispatched", List.of("delivered","cancelled"),
-                "delivered",  List.of("returned")
-        );
-        require(transitions.getOrDefault(from, Collections.emptyList()).contains(to),
-                "Invalid status transition: " + from + " → " + to);
-    }
-
-    private void updateCreditUsed(String userId, long used) {
-        users.updateCreditUsed(userId, used);
-    }
-
-    private static String uid(String prefix) {
-        byte[] b = new byte[5]; new SecureRandom().nextBytes(b);
-        return prefix + "-" + HexFormat.of().formatHex(b);
-    }
-
 }
-

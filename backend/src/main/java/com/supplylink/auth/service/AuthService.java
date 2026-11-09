@@ -52,7 +52,7 @@ public class AuthService {
     public Map<String, Object> me(String token) {
         if (token == null || token.isBlank()) return Map.of("user", null);
         try {
-            Map<String, Object> resolved = resolveSession(token);
+            Map<String, Object> resolved = resolveSessionRaw(token);
             @SuppressWarnings("unchecked")
             Map<String, Object> user    = (Map<String, Object>) resolved.get("user");
             @SuppressWarnings("unchecked")
@@ -96,7 +96,10 @@ public class AuthService {
             store.acquireAdvisoryLock();
             sessions.deleteByTokenHash(sha256(token));
         }
-        return Map.of("ok", true, "_clear_cookie", true);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ok", true);
+        result.put("_clear_cookie", true);
+        return result;
     }
 
     @Transactional
@@ -147,7 +150,37 @@ public class AuthService {
                 "message", "Registration submitted. An administrator must approve your access before you can sign in.");
     }
 
+    /**
+     * Authenticates a business request: valid session, a usable software licence (423 otherwise),
+     * and, for anything that changes data, a matching X-CSRF-Token header.
+     */
     public Map<String, Object> resolveSession(String token) {
+        Map<String, Object> resolved = resolveSessionRaw(token);
+        Map<String, Object> license = licenseService.status();
+        if (!Boolean.TRUE.equals(license.get("usable"))) {
+            BusinessException blocked = new BusinessException(
+                    "expired".equals(license.get("status"))
+                            ? "The software licence has expired."
+                            : "This installation has no active software licence.", 423);
+            blocked.setLicenseStatus(license);
+            throw blocked;
+        }
+        var attrs = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        if (attrs instanceof org.springframework.web.context.request.ServletRequestAttributes sra) {
+            String method = sra.getRequest().getMethod();
+            if (!"GET".equals(method) && !"HEAD".equals(method) && !"OPTIONS".equals(method)) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> session = (Map<String, Object>) resolved.get("session");
+                String sent = sra.getRequest().getHeader("X-CSRF-Token");
+                String expected = String.valueOf(session.get("csrf"));
+                require(sent != null && MessageDigest.isEqual(expected.getBytes(), sent.getBytes()),
+                        "Security token is missing or expired.", 403);
+            }
+        }
+        return resolved;
+    }
+
+    public Map<String, Object> resolveSessionRaw(String token) {
         require(token != null && !token.isBlank(), "Please sign in.", 401);
         Map<String, Object> session = sessions.findValidByHash(sha256(token)).orElse(null);
         require(session != null, "Your session has expired. Please sign in.", 401);

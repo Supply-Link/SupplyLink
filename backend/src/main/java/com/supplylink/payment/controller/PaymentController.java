@@ -29,6 +29,6 @@ public class PaymentController extends BaseController {
         Map<String, Object> resolved = authService.resolveSession(sessionToken(request));
         @SuppressWarnings("unchecked")
         Map<String, Object> actor = (Map<String, Object>) resolved.get("user");
-        return ResponseEntity.ok(paymentService.recordPayment(actor, body));
+        return ResponseEntity.ok(paymentService.recordPayment(actor, withIdempotencyKey(body, request)));
     }
 }

@@ -29,22 +29,22 @@ public class OrderRepository {
     }
 
     public List<Map<String, Object>> findAll() {
-        return jdbc.queryForList("SELECT * FROM orders ORDER BY sort_order")
+        return jdbc.queryForList("SELECT * FROM orders ORDER BY created_at ASC, sort_order ASC")
                 .stream().map(this::mapRow).toList();
     }
 
     public List<Map<String, Object>> findByRetailerId(String id) {
-        return jdbc.queryForList("SELECT * FROM orders WHERE retailer_id=? ORDER BY created_at DESC", id)
+        return jdbc.queryForList("SELECT * FROM orders WHERE retailer_id=? ORDER BY created_at ASC, sort_order ASC", id)
                 .stream().map(this::mapRow).toList();
     }
 
     public List<Map<String, Object>> findByDistributorId(String id) {
-        return jdbc.queryForList("SELECT * FROM orders WHERE distributor_id=? ORDER BY created_at DESC", id)
+        return jdbc.queryForList("SELECT * FROM orders WHERE distributor_id=? ORDER BY created_at ASC, sort_order ASC", id)
                 .stream().map(this::mapRow).toList();
     }
 
     public List<Map<String, Object>> findByDriverId(String id) {
-        return jdbc.queryForList("SELECT * FROM orders WHERE driver_id=? ORDER BY created_at DESC", id)
+        return jdbc.queryForList("SELECT * FROM orders WHERE driver_id=? ORDER BY created_at ASC, sort_order ASC", id)
                 .stream().map(this::mapRow).toList();
     }
 
@@ -102,8 +102,14 @@ public class OrderRepository {
         jdbc.update("UPDATE orders SET payment_status=? WHERE id=?", paymentStatus, orderId);
     }
 
+    /** Merges the given keys into the order's extra JSON, keeping everything already stored. */
+    public void mergeExtra(String orderId, Map<String, Object> extra) {
+        jdbc.update("UPDATE orders SET extra = COALESCE(extra, '{}'::jsonb) || ? WHERE id=?",
+                jsonb.toJsonb(extra), orderId);
+    }
+
     public void updateExtra(String orderId, Map<String, Object> extra) {
-        jdbc.update("UPDATE orders SET extra=? WHERE id=?", jsonb.toJsonb(extra), orderId);
+        mergeExtra(orderId, extra);
     }
 
     public Map<String, Object> mapRow(Map<String, Object> row) {

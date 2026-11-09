@@ -29,10 +29,10 @@ public class ProductController extends BaseController {
         Map<String, Object> resolved = authService.resolveSession(sessionToken(request));
         @SuppressWarnings("unchecked")
         Map<String, Object> actor = (Map<String, Object>) resolved.get("user");
-        String action = (String) body.getOrDefault("action", "create");
-        return switch (action) {
-            case "update" -> ResponseEntity.ok(productService.updateProduct(actor, body));
-            default       -> ResponseEntity.ok(productService.createProduct(actor, body));
-        };
+        // The portal contract: a body with an id edits that product, otherwise it creates one.
+        boolean update = body.get("id") != null || "update".equals(body.get("action"));
+        return update
+                ? ResponseEntity.ok(productService.updateProduct(actor, body))
+                : ResponseEntity.ok(productService.createProduct(actor, body));
     }
 }

@@ -33,14 +33,14 @@ public class PricingService {
     @Transactional
     public Map<String, Object> updatePricing(Map<String, Object> actor, Map<String, Object> body) {
         store.acquireAdvisoryLock();
-        require("admin".equals(actor.get("role")) || "distributor".equals(actor.get("role")),
-                "Your role cannot perform this action.", 403);
-        require(body.containsKey("bulk_min") && body.containsKey("bulk_discount_bps"),
-                "bulk_min and bulk_discount_bps are required.");
-        int bulkMin         = JsonbHelper.toInt(body.get("bulk_min"));
-        int bulkDiscountBps = JsonbHelper.toInt(body.get("bulk_discount_bps"));
-        require(bulkMin >= 0, "bulk_min must be non-negative.");
-        require(bulkDiscountBps >= 0 && bulkDiscountBps <= 10000, "bulk_discount_bps must be 0–10000.");
+        require("admin".equals(actor.get("role")), "Your role cannot perform this action.", 403);
+        Object min = body.get("bulk_min"), bps = body.get("bulk_discount_bps");
+        require(min instanceof Integer || min instanceof Long, "Bulk minimum must be an integer between 1 and 10000.");
+        require(bps instanceof Integer || bps instanceof Long, "Discount basis points must be an integer between 0 and 9000.");
+        int bulkMin = ((Number) min).intValue();
+        int bulkDiscountBps = ((Number) bps).intValue();
+        require(bulkMin >= 1 && bulkMin <= 10000, "Bulk minimum must be an integer between 1 and 10000.");
+        require(bulkDiscountBps >= 0 && bulkDiscountBps <= 9000, "Discount basis points must be an integer between 0 and 9000.");
         pricing.upsert(bulkMin, bulkDiscountBps);
         audit.insert((String) actor.get("id"), (String) actor.get("name"),
                 "Pricing updated", "bulk_min=" + bulkMin + " discount_bps=" + bulkDiscountBps);

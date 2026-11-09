@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Value;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 public abstract class BaseController {
@@ -16,6 +18,14 @@ public abstract class BaseController {
 
     @Value("${app.cookie-secure:false}")
     private boolean cookieSecure;
+
+    /** Copies the Idempotency-Key header into the body as request_key (the header wins over any body value). */
+    protected Map<String, Object> withIdempotencyKey(Map<String, Object> body, HttpServletRequest request) {
+        Map<String, Object> copy = new LinkedHashMap<>(body);
+        String key = request.getHeader("Idempotency-Key");
+        if (key != null && !key.isBlank()) copy.put("request_key", key.strip());
+        return copy;
+    }
 
     protected String sessionToken(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
