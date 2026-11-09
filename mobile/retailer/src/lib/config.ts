@@ -16,4 +16,5 @@ export const APP = {
 export const DEFAULT_SERVER: string = SERVER_URL || 'https://supplylink-2.onrender.com';
 
 export const SERVER_STORAGE_KEY = 'supplylink.server';
+export const OUTBOX_STORAGE_KEY = 'supplylink.outbox';
 export const LICENCE_POLL_MS = 15000;

@@ -7,7 +7,8 @@ import { useState } from 'react';
 import { Alert, Text, View, type GestureResponderEvent } from 'react-native';
 import Svg, { Polyline } from 'react-native-svg';
 import { Button, Card, colors, EmptyState, Field, Muted, Screen, Title } from '@/components/ui';
-import { useSession } from '@/session/SessionProvider';
+import { isQueued, useSession } from '@/session/SessionProvider';
+import { useToast } from '@/session/ToastProvider';
 
 const SIZE = 1000;
 type Stroke = number[][];
@@ -15,7 +16,8 @@ type Stroke = number[][];
 export default function ProofScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { workspace, request, refresh, keyFor, dropKey, showError, busy } = useSession();
+  const { workspace, request, refresh, keyFor, dropKey, showError, busy, pending } = useSession();
+  const toast = useToast();
   const order = workspace?.orders.find((entry) => entry.id === id);
   const [recipientName, setRecipientName] = useState('');
   const [strokes, setStrokes] = useState<Stroke[]>([]);
@@ -45,6 +47,11 @@ export default function ProofScreen() {
       <EmptyState message="This delivery is unavailable. Refresh your assigned orders." />
     </Screen>
   );
+  if (pending.some((item) => item.orderId === order.id && item.path === '/api/proof-of-delivery')) return (
+    <Screen title="Delivery confirmation" subtitle={order.number} onBack={router.back} bottomInset>
+      <EmptyState message="This proof is saved on your phone and will sync when you're back online." />
+    </Screen>
+  );
   if (order.status !== 'out_for_delivery') return (
     <Screen title="Delivery confirmation" onBack={router.back} bottomInset>
       <EmptyState message="This order is not awaiting delivery confirmation." />
@@ -61,8 +68,13 @@ export default function ProofScreen() {
         const scope = `proof:${order.id}`;
         const result = await request('POST', '/api/proof-of-delivery', {
           order_id: order.id, recipient_name: recipientName.trim(), signature,
-        }, { idempotencyKey: keyFor(scope) });
+        }, { idempotencyKey: keyFor(scope), queue: { label: `Proof of delivery · ${order.number}`, orderId: order.id } });
         if (!result) return;
+        if (isQueued(result)) {
+          toast("Saved. Delivery will be confirmed when you're back online.");
+          router.back();
+          return;
+        }
         dropKey(scope);
         await refresh();
         router.back();

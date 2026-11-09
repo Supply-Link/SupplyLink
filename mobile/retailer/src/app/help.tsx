@@ -8,12 +8,12 @@ import { useSession } from '@/session/SessionProvider';
 
 export default function HelpScreen() {
   const router = useRouter();
-  const { serverUrl, refresh } = useSession();
+  const { refresh } = useSession();
   return (
     <Screen title="Help & support" subtitle="Quick answers for your pharmacy workspace" onBack={router.back} bottomInset>
       <Card>
         <Title className="text-base">Account and access</Title>
-        <Muted>New accounts must be approved by an administrator. If you can sign in but see a licence screen, ask the server owner to activate or renew the SupplyLink licence.</Muted>
+        <Muted>New accounts must be approved by an administrator. If you can sign in but see a licence screen, ask your administrator to renew the SupplyLink licence.</Muted>
       </Card>
       <Card>
         <Title className="text-base">Medicines and orders</Title>
@@ -23,8 +23,7 @@ export default function HelpScreen() {
       </Card>
       <Card>
         <Title className="text-base">Connection problems</Title>
-        <Muted>Check that your phone can reach the server shown below. A production server needs a trusted HTTPS address.</Muted>
-        <Muted>Server: {serverUrl}</Muted>
+        <Muted>Check that your phone is online. If SupplyLink still can't load, wait a moment and try again.</Muted>
         <Button title="Try refreshing" icon={RefreshCw} variant="secondary" onPress={refresh} />
       </Card>
       <SectionLabel>Need a person?</SectionLabel>

@@ -26,6 +26,7 @@ export default function BasketScreen() {
   const [method, setMethod] = useState<'cod' | 'credit'>('cod');
 
   const products = new Map((workspace?.products ?? []).map((p) => [p.id, p]));
+  const estimate = [...cart.lines].reduce((sum, [id, qty]) => sum + (products.get(id)?.price ?? 0) * qty, 0);
 
   const reviewQuote = async () => {
     const quote = await request<Quote>('POST', '/api/quote', { items: cart.items(), supply_state_code: stateCode });
@@ -35,7 +36,25 @@ export default function BasketScreen() {
   };
 
   return (
-    <Screen title="Basket" subtitle={user?.business ?? user?.name}>
+    <Screen
+      title="Basket"
+      subtitle={user?.business ?? user?.name}
+      loading={!workspace}
+      footer={
+        cart.lines.size > 0 ? (
+          <View className="border-t border-line bg-white px-5 pb-3 pt-3">
+            <View className="flex-row items-center justify-between">
+              <View>
+                <Text className="text-xs font-semibold uppercase tracking-wide text-muted">Estimated subtotal</Text>
+                <Text className="text-xl font-bold text-ink">{money(estimate)}</Text>
+              </View>
+              <Text className="text-xs text-muted">excl. GST · final price on next step</Text>
+            </View>
+            <Button title="Review order" icon={ReceiptText} disabled={busy || !address.trim()} onPress={reviewQuote} />
+          </View>
+        ) : undefined
+      }
+    >
       {cart.lines.size === 0 ? (
         <>
           <EmptyState message="Your basket is empty. Browse medicines to start an order." icon={ShoppingBasket} />
@@ -50,7 +69,14 @@ export default function BasketScreen() {
 
           <Card>
             <Title>Delivery & billing</Title>
-            <Field label="Delivery address" value={address} onChangeText={setAddress} multiline />
+            <Field
+              label="Delivery address"
+              value={address}
+              onChangeText={setAddress}
+              multiline
+              placeholder="Shop number, street, area, city, PIN"
+              error={address.trim() ? undefined : 'Add a delivery address to continue.'}
+            />
             <Select
               label="Place of supply · GST state"
               value={stateCode}
@@ -58,10 +84,8 @@ export default function BasketScreen() {
               onChange={setStateCode}
             />
             <Segmented label="Payment method" value={method} options={PAYMENT_OPTIONS} onChange={setMethod} />
-            <Button title="Review server quote" icon={ReceiptText} disabled={busy} onPress={reviewQuote} />
             <Muted>
-              Final batches are allocated by earliest expiry when the order is placed. Review the server quote before
-              confirming.
+              Final prices and GST are calculated when you review the order. Batches are picked by earliest expiry.
             </Muted>
           </Card>
         </>
@@ -75,9 +99,13 @@ function BasketLine({ product, quantity }: { product: Product; quantity: number 
   return (
     <Card>
       <Text className="text-lg font-bold text-ink">{product.name}</Text>
-      <Muted className="text-sm">
-        {quantity} × {money(product.price)} excl. GST · {product.stock} in stock
-      </Muted>
+      <View className="flex-row items-center justify-between">
+        <Muted className="text-sm">
+          {quantity} × {money(product.price)} excl. GST
+        </Muted>
+        <Text className="text-base font-bold text-ink">{money(product.price * quantity)}</Text>
+      </View>
+      {quantity >= product.stock ? <Text className="mt-1 text-xs font-semibold text-[#b26a00]">Maximum available quantity added</Text> : null}
       <View className="mt-3 flex-row items-center">
         <Stepper icon={Minus} label="Decrease quantity" disabled={quantity <= 1} onPress={() => cart.setQuantity(product, quantity - 1)} />
         <Text className="w-12 text-center text-lg font-bold text-ink" accessibilityLabel={`Quantity ${quantity}`}>

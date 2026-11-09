@@ -5,6 +5,7 @@ import '../global.css';
 
 import { StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import RootNavigator from '@/navigation/RootNavigator';
 import { SessionProvider } from '@/session/SessionProvider';
 import { ToastProvider } from '@/session/ToastProvider';
@@ -15,7 +16,9 @@ export default function App() {
       <ToastProvider>
         <SessionProvider>
           <StatusBar barStyle="light-content" />
-          <RootNavigator />
+          <ErrorBoundary>
+            <RootNavigator />
+          </ErrorBoundary>
         </SessionProvider>
       </ToastProvider>
     </SafeAreaProvider>

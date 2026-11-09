@@ -61,7 +61,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return;
       }
       changed(new Map(lines).set(product.id, quantity));
-      toast(`Added to basket · ${quantity} × ${product.name}`);
     },
     [changed, lines, toast],
   );

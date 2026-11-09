@@ -56,7 +56,10 @@ export function OrderCard({ order }: { order: Order }) {
           <Text className="text-lg font-bold text-ink">{money(order.total)}</Text>
         </View>
         <StageBadge status={order.status} />
-        <Text className="mt-1.5 text-[13px] text-muted">{order.retailer_name}</Text>
+        <Text className="mt-1.5 text-[13px] text-muted" numberOfLines={1}>
+          {order.supplier?.business ? `From ${order.supplier.business}` : order.retailer_name}
+          {order.lines?.length ? ` · ${order.lines.length} ${order.lines.length === 1 ? 'item' : 'items'}` : ''}
+        </Text>
         <Text className="text-[13px] text-muted">{dateTime(order.created_at)}</Text>
       </View>
       <ChevronRight size={18} color={colors.muted} style={{ marginLeft: 8 }} />

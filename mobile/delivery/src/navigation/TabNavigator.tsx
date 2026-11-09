@@ -26,6 +26,7 @@ export default function TabNavigator() {
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
         tabBarStyle: { backgroundColor: colors.white, borderTopColor: '#e5e8e3' },
+        tabBarItemStyle: { paddingBottom: 4 },
         tabBarBadgeStyle: { backgroundColor: colors.brand },
       }}
     >

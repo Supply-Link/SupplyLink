@@ -15,8 +15,10 @@ export default function AlertsScreen() {
   };
 
   return (
-    <Screen title="Notifications" onBack={router.back} onRefresh={refresh} bottomInset>
-      <Button title="Mark all read" icon={CheckCheck} variant="secondary" onPress={markAllRead} />
+    <Screen title="Notifications" onBack={router.back} onRefresh={refresh} bottomInset loading={!workspace}>
+      {workspace?.notifications.some((n) => !n.read) ? (
+        <Button title="Mark all read" icon={CheckCheck} variant="secondary" onPress={markAllRead} />
+      ) : null}
       <NotificationList notifications={workspace?.notifications ?? []} emptyIcon={Bell} />
     </Screen>
   );

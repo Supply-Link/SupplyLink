@@ -14,6 +14,9 @@ export class ApiFailure extends Error {
   }
 }
 
+/** The request never reached the server (no signal, DNS, timeout). Safe to retry with the same key. */
+export class NetworkError extends Error {}
+
 /**
  * The session cookie and CSRF token live only in memory. Requests use
  * `credentials: 'omit'` so React Native's persistent native cookie jar is
@@ -52,7 +55,7 @@ export class Api {
       this.storeSession(response.headers.get('set-cookie'));
       text = await response.text();
     } catch {
-      throw new Error(
+      throw new NetworkError(
         controller.signal.aborted
           ? 'The server took too long to respond.'
           : 'Connection failed. Check the server URL and network.',
