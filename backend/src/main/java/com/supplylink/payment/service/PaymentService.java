@@ -4,6 +4,7 @@ import com.supplylink.audit.repository.AuditRepository;
 import com.supplylink.common.BusinessException;
 import com.supplylink.notification.repository.NotificationRepository;
 import com.supplylink.order.repository.OrderRepository;
+import com.supplylink.order.service.OrderService;
 import com.supplylink.payment.repository.PaymentRepository;
 import com.supplylink.store.DatabaseStore;
 import com.supplylink.store.JsonbHelper;
@@ -15,10 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
-import static com.supplylink.auth.service.AuthService.*;
+import static com.supplylink.auth.service.AuthService.require;
+import static com.supplylink.auth.service.AuthService.text;
 
 @Service
 public class PaymentService {
@@ -26,34 +27,51 @@ public class PaymentService {
     private final DatabaseStore          store;
     private final PaymentRepository      payments;
     private final OrderRepository        orders;
+    private final OrderService           orderService;
     private final UserRepository         users;
     private final NotificationRepository notifications;
     private final AuditRepository        audit;
 
     @Autowired
     public PaymentService(DatabaseStore store, PaymentRepository payments, OrderRepository orders,
-                          UserRepository users, NotificationRepository notifications, AuditRepository audit) {
+                          OrderService orderService, UserRepository users,
+                          NotificationRepository notifications, AuditRepository audit) {
         this.store = store; this.payments = payments; this.orders = orders;
-        this.users = users; this.notifications = notifications; this.audit = audit;
+        this.orderService = orderService; this.users = users;
+        this.notifications = notifications; this.audit = audit;
     }
 
+    /** Records the full offline collection for a delivered order (admin, distributor or delivery partner). */
     @Transactional
     public Map<String, Object> recordPayment(Map<String, Object> actor, Map<String, Object> body) {
         store.acquireAdvisoryLock();
-        require("admin".equals(actor.get("role")) || "distributor".equals(actor.get("role")),
+        String role = (String) actor.get("role");
+        require("admin".equals(role) || "distributor".equals(role) || "delivery".equals(role),
                 "Your role cannot perform this action.", 403);
-        String requestKey = text(body.get("request_key"), "Request key", 100);
+        Map<String, Object> order = orderService.getAccessibleOrder(actor, body.get("order_id"));
+        Object k = body.get("request_key");
+        require(k instanceof String s && s.length() >= 8 && s.length() <= 120, "An idempotency key is required.");
+        String requestKey = (String) k;
+
         var existing = payments.findByActorAndKey((String) actor.get("id"), requestKey);
-        if (existing.isPresent()) return existing.get();
-        String orderId = text(body.get("order_id"), "Order ID", 50);
-        Map<String, Object> order = orders.findById(orderId)
-                .orElseThrow(() -> new BusinessException("Order not found.", 404));
-        String status = (String) order.get("status");
-        require(!"cancelled".equals(status) && !"draft".equals(status),
-                "Payment cannot be recorded for this order.");
-        long amount = JsonbHelper.toLong(body.get("amount"));
-        require(amount > 0, "Amount must be positive.");
-        String reference = body.getOrDefault("reference", "") instanceof String s ? s.strip() : "";
+        if (existing.isPresent()) {
+            require(order.get("id").equals(existing.get().get("order_id")),
+                    "Payment key was already used for another order.", 409);
+            return existing.get();
+        }
+        require(!"cancelled".equals(order.get("status")), "Cannot pay a cancelled order.", 409);
+        require(!"paid".equals(order.get("payment_status")), "This order is already paid.", 409);
+        require("delivered".equals(order.get("status")), "Record collection after delivery.", 409);
+
+        Object a = body.get("amount");
+        require(a instanceof Integer || a instanceof Long, "Amount must be an integer between 1 and 100000000000000.");
+        long amount = ((Number) a).longValue();
+        require(amount >= 1 && amount <= 100_000_000_000_000L,
+                "Amount must be an integer between 1 and 100000000000000.");
+        require(amount == JsonbHelper.toLong(order.get("total")), "Record the full outstanding order amount.");
+        String reference = text(body.get("reference"), "Receipt reference", 100);
+
+        String orderId = (String) order.get("id");
         Map<String, Object> payment = new LinkedHashMap<>();
         payment.put("id",           uid("pay"));
         payment.put("order_id",     orderId);
@@ -63,20 +81,23 @@ public class PaymentService {
         payment.put("actor_id",     actor.get("id"));
         payment.put("request_key",  requestKey);
         payments.insert(payment);
-        long total = JsonbHelper.toLong(order.getOrDefault("total", 0));
-        long paid  = payments.findByOrderIds(List.of(orderId)).stream()
-                .mapToLong(p -> JsonbHelper.toLong(p.getOrDefault("amount", 0))).sum();
-        if (paid >= total) orders.updatePaymentStatus(orderId, "paid");
-        users.findById((String) order.get("retailer_id")).ifPresent(r ->
-                notifications.insert((String) r.get("id"), "Payment received",
-                        "₹" + amount / 100.0 + " recorded for order #" + order.get("number")));
-        audit.insert((String) actor.get("id"), (String) actor.get("name"),
-                "Payment recorded", "₹" + amount / 100.0 + " for order #" + order.get("number"));
-        return payment;
+        orders.updatePaymentStatus(orderId, "paid");
+
+        Map<String, Object> retailer = users.findById((String) order.get("retailer_id"))
+                .orElseThrow(() -> new BusinessException("Record not found.", 404));
+        if ("credit".equals(order.get("payment_method")))
+            users.updateCreditUsed((String) retailer.get("id"),
+                    Math.max(0, JsonbHelper.toLong(retailer.get("credit_used")) - amount));
+        notifications.insert((String) retailer.get("id"), "Payment recorded",
+                order.get("number") + ": your offline payment has been recorded.");
+        audit.insert((String) actor.get("id"), (String) actor.get("name"), "Payment recorded",
+                (String) order.get("number"));
+        return payments.findByActorAndKey((String) actor.get("id"), requestKey).orElse(payment);
     }
 
     private static String uid(String prefix) {
-        byte[] b = new byte[5]; new SecureRandom().nextBytes(b);
+        byte[] b = new byte[5];
+        new SecureRandom().nextBytes(b);
         return prefix + "-" + HexFormat.of().formatHex(b);
     }
 }
