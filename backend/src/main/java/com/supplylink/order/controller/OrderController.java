@@ -3,6 +3,7 @@ package com.supplylink.order.controller;
 import com.supplylink.auth.service.AuthService;
 import com.supplylink.common.BaseController;
 import com.supplylink.order.service.OrderService;
+import com.supplylink.page.service.PageService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -15,9 +16,11 @@ public class OrderController extends BaseController {
 
     private final AuthService  authService;
     private final OrderService orderService;
+    private final PageService  pageService;
 
     @Autowired
-    public OrderController(AuthService authService, OrderService orderService) {
+    public OrderController(AuthService authService, OrderService orderService, PageService pageService) {
+        this.pageService = pageService;
         this.authService = authService;
         this.orderService = orderService;
     }
@@ -27,7 +30,7 @@ public class OrderController extends BaseController {
         Map<String, Object> resolved = authService.resolveSession(sessionToken(request));
         @SuppressWarnings("unchecked")
         Map<String, Object> user = (Map<String, Object>) resolved.get("user");
-        return ResponseEntity.ok(Map.of("orders", orderService.getOrdersForUser(user)));
+        return ResponseEntity.ok(pageService.state(user));
     }
 
     @PostMapping("/api/quote")
