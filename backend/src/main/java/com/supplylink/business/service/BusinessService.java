@@ -31,20 +31,37 @@ public class BusinessService {
     @Transactional
     public Map<String, Object> updateBusiness(Map<String, Object> actor, Map<String, Object> body) {
         store.acquireAdvisoryLock();
-        String business  = text(body.get("business"),  "Business name",    100);
-        String legalName = text(body.get("legal_name"), "Legal name",       100);
-        String address   = text(body.get("address"),   "Address",           500);
-        String stateCode = (String) body.get("state_code");
-        require(PharmacyHelper.STATE_CODES.contains(stateCode), "Select a valid state code.");
-        String gstin = body.getOrDefault("gstin", "") instanceof String s ? s.strip().toUpperCase() : "";
+        require("admin".equals(actor.get("role")) || "retailer".equals(actor.get("role"))
+                        || "distributor".equals(actor.get("role")),
+                "Your role cannot perform this action.", 403);
+        Object requested = body.getOrDefault("user_id", actor.get("id"));
+        require(requested instanceof String, "Record not found.", 404);
+        Map<String, Object> target = users.findById((String) requested)
+                .orElseThrow(() -> new com.supplylink.common.BusinessException("Record not found.", 404));
+        require("admin".equals(actor.get("role")) || target.get("id").equals(actor.get("id")),
+                "You cannot edit another business.", 403);
+        require("retailer".equals(target.get("role")) || "distributor".equals(target.get("role"))
+                        || "admin".equals(target.get("role")),
+                "This account has no business tax profile.");
+        Object code = body.get("state_code");
+        require(code instanceof String c && PharmacyHelper.STATE_CODES.contains(c),
+                "Select a valid Indian state / territory code.");
+        String stateCode = (String) code;
+        Object rawGstin = body.getOrDefault("gstin", "");
+        require(rawGstin instanceof String, "Invalid GSTIN.");
+        String gstin = ((String) rawGstin).strip().toUpperCase();
         require(gstin.isEmpty() || (GSTIN_RE.matcher(gstin).matches() && gstin.startsWith(stateCode)),
-                "GSTIN format must match your state code.");
-        String license = body.getOrDefault("drug_license", "") instanceof String s2 ? s2.strip() : "";
-        require(license.length() <= 100, "Invalid drug licence number.");
-        users.updateBusinessProfile((String) actor.get("id"), business, legalName, address,
-                stateCode, gstin, license);
+                "GSTIN must have a valid 15-character format and match the state code.");
+        String legalName = text(body.get("legal_name"), "Legal business name", 150);
+        String address   = text(body.get("address"), "Business address", 500);
+        Object rawLicense = body.getOrDefault("drug_license", "");
+        require(rawLicense instanceof String l && l.length() <= 100,
+                "Drug licence number must be at most 100 characters.");
+        String license = ((String) rawLicense).strip();
+        users.updateBusinessProfile((String) target.get("id"), (String) target.get("business"),
+                legalName, address, stateCode, gstin, license);
         audit.insert((String) actor.get("id"), (String) actor.get("name"),
-                "Business profile updated", business);
-        return UserRepository.safeUser(users.findById((String) actor.get("id")).orElseThrow());
+                "Business tax profile updated", (String) target.get("business"));
+        return UserRepository.businessSnapshot(users.findById((String) target.get("id")).orElseThrow());
     }
 }

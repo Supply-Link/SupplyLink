@@ -23,7 +23,7 @@ public class NotificationRepository {
 
     public List<Map<String, Object>> findByUserId(String userId) {
         return jdbc.queryForList(
-                "SELECT * FROM notifications WHERE user_id = ? ORDER BY sort_order DESC", userId)
+                "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at ASC, sort_order ASC", userId)
                 .stream().map(this::mapRow).toList();
     }
 
