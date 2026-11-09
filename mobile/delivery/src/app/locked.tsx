@@ -3,11 +3,12 @@
 
 import { LogOut, RefreshCw, ShieldAlert } from 'lucide-react-native';
 import { View } from 'react-native';
-import { Body, Button, Card, colors, Muted, Screen, Title } from '@/components/ui';
+import { Body, Button, Card, colors, useSpinningAction, Muted, Screen, Title } from '@/components/ui';
 import { useSession } from '@/session/SessionProvider';
 
 export default function LockedScreen() {
-  const { user, licence, licenceExpired, checkLicence, signOut, busy } = useSession();
+  const { user, licence, licenceExpired, checkLicence, signOut } = useSession();
+  const checking = useSpinningAction(checkLicence);
 
   return (
     <Screen title="Licence required" subtitle={`Signed in as ${user?.name ?? ''}`} bottomInset>
@@ -25,7 +26,7 @@ export default function LockedScreen() {
           Only sign-in and sign-out are available. Contact your administrator to activate the installation.
         </Muted>
         {licence.expires_on ? <Muted>Valid through {licence.expires_on} (India time)</Muted> : null}
-        <Button title="Check activation" icon={RefreshCw} disabled={busy} onPress={checkLicence} />
+        <Button title={checking.spinning ? 'Checking…' : 'Check activation'} icon={RefreshCw} spinning={checking.spinning} onPress={checking.run} />
         <Button title="Sign out" icon={LogOut} variant="secondary" onPress={signOut} />
       </Card>
     </Screen>

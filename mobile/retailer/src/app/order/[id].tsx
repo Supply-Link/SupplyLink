@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from '@/navigation/router';
 import { CircleX, FileText, MapPin, Package, RefreshCw, RotateCcw } from 'lucide-react-native';
 import { Alert, Text, View } from 'react-native';
 import { StageBadge, Timeline, Totals } from '@/components/orders';
-import { Body, Button, Card, colors, EmptyState, Muted, Screen, Title } from '@/components/ui';
+import { Body, Button, useSpinningAction, Card, colors, EmptyState, Muted, Screen, Title } from '@/components/ui';
 import { cancellable, dateTime, money, percent, stageLabel } from '@/lib/rules';
 import { stateName } from '@/lib/states';
 import { useSession } from '@/session/SessionProvider';
@@ -14,6 +14,7 @@ export default function OrderScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { workspace, request, refresh } = useSession();
+  const refreshing = useSpinningAction(refresh);
   const order = workspace?.orders.find((o) => o.id === id);
 
   if (!order) {
@@ -117,7 +118,7 @@ export default function OrderScreen() {
       {cancellable(order.status, order.payment_status) ? (
         <Button title="Cancel order" icon={CircleX} variant="danger" onPress={confirmCancel} />
       ) : null}
-      <Button title="Refresh order" icon={RefreshCw} variant="secondary" onPress={refresh} />
+      <Button title={refreshing.spinning ? 'Refreshing…' : 'Refresh order'} icon={RefreshCw} spinning={refreshing.spinning} variant="secondary" onPress={refreshing.run} />
     </Screen>
   );
 }

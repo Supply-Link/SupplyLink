@@ -6,7 +6,7 @@ import { Banknote, MapPin, Navigation, Package, PackageCheck, PencilLine, Refres
 import { useState } from 'react';
 import { Alert, Linking, Text, View } from 'react-native';
 import { StageBadge, Timeline, Totals } from '@/components/orders';
-import { Body, Button, Card, colors, Dialog, EmptyState, Field, Muted, Screen, Title } from '@/components/ui';
+import { Body, Button, useSpinningAction, Card, colors, Dialog, EmptyState, Field, Muted, Screen, Title } from '@/components/ui';
 import { currentFix } from '@/lib/location';
 import { coordinate, dateTime, money, percent, stageLabel } from '@/lib/rules';
 import { stateName } from '@/lib/states';
@@ -18,6 +18,7 @@ export default function OrderScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { workspace, refresh } = useSession();
+  const refreshing = useSpinningAction(refresh);
   const order = workspace?.orders.find((o) => o.id === id);
 
   if (!order) {
@@ -119,7 +120,7 @@ export default function OrderScreen() {
         </Card>
       ) : null}
 
-      <Button title="Refresh order" icon={RefreshCw} variant="secondary" onPress={refresh} />
+      <Button title={refreshing.spinning ? 'Refreshing…' : 'Refresh order'} icon={RefreshCw} spinning={refreshing.spinning} variant="secondary" onPress={refreshing.run} />
     </Screen>
   );
 }

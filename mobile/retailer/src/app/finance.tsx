@@ -5,13 +5,14 @@ import { useRouter } from '@/navigation/router';
 import { Banknote, CreditCard, RefreshCw, ReceiptText } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 import { OrderCard } from '@/components/orders';
-import { Button, Card, colors, EmptyState, Muted, Row, Screen, SectionLabel, Title } from '@/components/ui';
+import { Button, Card, colors, useSpinningAction, EmptyState, Muted, Row, Screen, SectionLabel, Title } from '@/components/ui';
 import { dateTime, money } from '@/lib/rules';
 import { useSession } from '@/session/SessionProvider';
 
 export default function FinanceScreen() {
   const router = useRouter();
   const { user, workspace, refresh } = useSession();
+  const refreshing = useSpinningAction(refresh);
   const limit = user?.credit_limit ?? 0;
   const used = user?.credit_used ?? 0;
   const available = Math.max(0, limit - used);
@@ -55,7 +56,7 @@ export default function FinanceScreen() {
           <Muted>{dateTime(payment.at)}</Muted>
         </Card>
       ))}
-      <Button title="Refresh balances" icon={RefreshCw} variant="secondary" onPress={refresh} />
+      <Button title={refreshing.spinning ? 'Refreshing…' : 'Refresh balances'} icon={RefreshCw} spinning={refreshing.spinning} variant="secondary" onPress={refreshing.run} />
     </Screen>
   );
 }
