@@ -39,6 +39,7 @@ public class PageService {
     private final OrderService           orderService;
     private final ProductService         productService;
     private final PricingService         pricingService;
+    private final com.supplylink.auth.service.LicenseService licenseService;
 
     @Autowired
     public PageService(UserRepository users, ProductRepository products, BatchRepository batches,
@@ -47,13 +48,15 @@ public class PageService {
                        PaymentRepository payments, PricingRepository pricing,
                        AuditRepository audit, NotificationRepository notifications,
                        OrderService orderService, ProductService productService,
-                       PricingService pricingService) {
+                       PricingService pricingService,
+                       com.supplylink.auth.service.LicenseService licenseService) {
         this.users = users; this.products = products; this.batches = batches;
         this.orders = orders; this.lines = lines; this.history = history;
         this.tracking = tracking; this.payments = payments; this.pricing = pricing;
         this.audit = audit; this.notifications = notifications;
         this.orderService = orderService; this.productService = productService;
         this.pricingService = pricingService;
+        this.licenseService = licenseService;
     }
 
     @Transactional(readOnly = true)
@@ -61,7 +64,7 @@ public class PageService {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("user",    UserRepository.safeUser(user));
         r.put("csrf",    session.get("csrf"));
-        r.put("license", Map.of("status","valid","usable",true,"type","community"));
+        r.put("license", licenseService.status());
         return r;
     }
 
@@ -96,11 +99,13 @@ public class PageService {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("user",          UserRepository.safeUser(user));
         r.put("business_date", java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")).toString());
-        r.put("orders",        orderService.getOrdersForUser(user));
+        List<Map<String, Object>> visibleOrders = orderService.getOrdersForUser(user);
+        r.put("orders",        visibleOrders);
         r.put("products",      "delivery".equals(user.get("role"))
                                    ? Collections.emptyList()
                                    : productService.getProductsForUser(user));
-        r.put("payments",      paymentsPage(user).get("payments"));
+        // Payments for every order this user can see (so a driver sees what they collected).
+        r.put("payments",      payments.findByOrderIds(visibleOrders.stream().map(o -> (String) o.get("id")).toList()));
         r.put("notifications", notifications.findByUserId(userId));
         r.put("pricing",       pricingService.getPricing());
         return r;

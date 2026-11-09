@@ -49,7 +49,7 @@ public class OrderController extends BaseController {
         Map<String, Object> resolved = authService.resolveSession(sessionToken(request));
         @SuppressWarnings("unchecked")
         Map<String, Object> user = (Map<String, Object>) resolved.get("user");
-        return ResponseEntity.ok(orderService.createOrder(user, body));
+        return ResponseEntity.ok(orderService.createOrder(user, withIdempotencyKey(body, request)));
     }
 
     @PostMapping("/api/orders/{id}")
@@ -72,7 +72,7 @@ public class OrderController extends BaseController {
         Map<String, Object> resolved = authService.resolveSession(sessionToken(request));
         @SuppressWarnings("unchecked")
         Map<String, Object> actor = (Map<String, Object>) resolved.get("user");
-        return ResponseEntity.ok(orderService.captureProofOfDelivery(actor, body));
+        return ResponseEntity.ok(orderService.captureProofOfDelivery(actor, withIdempotencyKey(body, request)));
     }
 
     @PostMapping("/api/returns")
@@ -82,7 +82,7 @@ public class OrderController extends BaseController {
         Map<String, Object> resolved = authService.resolveSession(sessionToken(request));
         @SuppressWarnings("unchecked")
         Map<String, Object> actor = (Map<String, Object>) resolved.get("user");
-        return ResponseEntity.ok(orderService.manageReturn(actor, body));
+        return ResponseEntity.ok(orderService.manageReturn(actor, withIdempotencyKey(body, request)));
     }
 
     @PostMapping("/api/tracking")

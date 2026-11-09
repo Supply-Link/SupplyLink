@@ -63,6 +63,34 @@ public class DatabaseStore {
         jdbc.execute("SELECT pg_advisory_xact_lock(" + LOCK_ID + ")");
     }
 
+    /**
+     * Every medicine is batch-tracked. Demo products get one sample batch holding their opening stock;
+     * other products with opening stock keep it as "unallocated" until batches are received.
+     */
+    private static void addDefaultBatches(Map<String, Object> p) {
+        if (p.containsKey("batches") || p.get("generic_name") == null) return;
+        List<Map<String, Object>> list = new java.util.ArrayList<>();
+        long stock = JsonbHelper.toLong(p.getOrDefault("stock", 0));
+        if (Boolean.TRUE.equals(p.get("demo"))) {
+            long price = JsonbHelper.toLong(p.get("price"));
+            java.time.LocalDate today = com.supplylink.product.PharmacyHelper.today();
+            Map<String, Object> b = new java.util.LinkedHashMap<>();
+            b.put("id", "batch-demo-" + p.get("id"));
+            b.put("batch_number", "DEMO-" + String.valueOf(p.get("sku")).replace("MED-", "") + "-01");
+            b.put("manufacturing_date", today.minusDays(90).toString());
+            b.put("expiry_date", today.plusDays("med04".equals(p.get("id")) ? 60 : 540).toString());
+            b.put("stock", stock);
+            b.put("mrp", price * 3 / 2);
+            b.put("purchase_price", price * 4 / 5);
+            b.put("quarantined", false);
+            b.put("demo", true);
+            list.add(b);
+        } else if (stock > 0) {
+            p.put("unallocated_stock", stock);
+        }
+        p.put("batches", list);
+    }
+
     @SuppressWarnings("unchecked")
     private void seed() {
         try (InputStream is = getClass().getResourceAsStream("/db/seed.json")) {
@@ -99,6 +127,7 @@ public class DatabaseStore {
             List<Map<String, Object>> products = (List<Map<String, Object>>) data.get("products");
             for (int i = 0; i < products.size(); i++) {
                 Map<String, Object> p = products.get(i);
+                addDefaultBatches(p);
                 boolean hasBatches = p.containsKey("batches");
                 boolean hasUnallocated = p.containsKey("unallocated_stock");
                 jdbc.update("""

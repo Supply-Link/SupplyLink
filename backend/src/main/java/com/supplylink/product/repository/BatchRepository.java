@@ -67,7 +67,8 @@ public class BatchRepository {
                 Date.valueOf((String) batch.get("expiry_date")),
                 JsonbHelper.toLong(batch.get("stock")),
                 JsonbHelper.toLong(batch.get("mrp")),
-                JsonbHelper.toLong(batch.getOrDefault("purchase_price", 0)));
+                JsonbHelper.toLong(batch.getOrDefault("purchase_price", 0)),
+                Boolean.TRUE.equals(batch.get("quarantined")));
     }
 
     public void updateStock(String batchId, long newStock) {

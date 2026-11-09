@@ -31,7 +31,7 @@ public class PaymentRepository {
     public List<Map<String, Object>> findByOrderIds(List<String> orderIds) {
         if (orderIds.isEmpty()) return Collections.emptyList();
         String ph = String.join(",", Collections.nCopies(orderIds.size(), "?"));
-        return jdbc.queryForList("SELECT * FROM payments WHERE order_id IN (" + ph + ")", orderIds.toArray())
+        return jdbc.queryForList("SELECT * FROM payments WHERE order_id IN (" + ph + ") ORDER BY sort_order", orderIds.toArray())
                 .stream().map(this::mapRow).toList();
     }
 

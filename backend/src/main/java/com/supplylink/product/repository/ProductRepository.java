@@ -98,6 +98,23 @@ public class ProductRepository {
                 stock, unallocatedStock, hasUnallocated, id);
     }
 
+    public void setUnallocated(String id, long quantity) {
+        jdbc.update("UPDATE products SET unallocated_stock=?, has_unallocated_stock=true WHERE id=?", quantity, id);
+    }
+
+    public void markBatchTracked(String id) {
+        jdbc.update("UPDATE products SET has_batches=true WHERE id=?", id);
+    }
+
+    public void setStock(String id, long stock) {
+        jdbc.update("UPDATE products SET stock=? WHERE id=?", stock, id);
+    }
+
+    public void addUnallocated(String id, long quantity) {
+        jdbc.update("UPDATE products SET unallocated_stock = unallocated_stock + ?, has_unallocated_stock = true WHERE id=?",
+                quantity, id);
+    }
+
     public void adjustStock(String id, long delta) {
         jdbc.update("UPDATE products SET stock = GREATEST(0, stock + ?) WHERE id=?", delta, id);
     }
