@@ -49,6 +49,14 @@ public class ProductService {
                             batchMap.getOrDefault((String) p.get("id"), Collections.emptyList()));
             }
         }
+        // Purchase prices are cost data: only admins and distributors may see them.
+        if (!"admin".equals(role) && !"distributor".equals(role)) {
+            for (Map<String, Object> p : list) {
+                if (p.get("batches") instanceof List<?> bl)
+                    for (Object b : bl)
+                        if (b instanceof Map<?, ?> bm) bm.remove("purchase_price");
+            }
+        }
         return list;
     }
 
