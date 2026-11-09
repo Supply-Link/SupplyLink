@@ -21,6 +21,17 @@ const stackRoutes: Record<string, string> = {
   '/help': 'Help',
 };
 
+/** A slow device queues taps while a screen is still opening; repeat taps must not open it again. */
+const BACK_COOLDOWN_MS = 600;
+let lastBack = 0;
+
+function sameParams(a?: object, b?: object) {
+  const left = (a ?? {}) as Record<string, unknown>;
+  const right = (b ?? {}) as Record<string, unknown>;
+  const keys = Object.keys(left);
+  return keys.length === Object.keys(right).length && keys.every((key) => left[key] === right[key]);
+}
+
 function targetParts(target: RouteTarget) {
   if (typeof target === 'string') return { pathname: target, params: undefined };
   return { pathname: target.pathname, params: target.params };
@@ -46,6 +57,10 @@ export function useRouter() {
 
     const routeName = stackRoutes[pathname];
     if (!routeName) throw new Error(`Unknown app route: ${pathname}`);
+    // Already showing (or opening) this exact screen: ignore the repeat tap.
+    const state = root.getState();
+    const top = state?.routes[state.index];
+    if (top && top.name === routeName && sameParams(top.params, params)) return;
     if (method === 'push') root.dispatch(StackActions.push(routeName, params));
     else root.navigate(routeName, params);
   }
@@ -53,7 +68,12 @@ export function useRouter() {
   return {
     push: (target: RouteTarget) => go(target, 'push'),
     navigate: (target: RouteTarget) => go(target, 'navigate'),
-    back: () => navigation.goBack(),
+    back: () => {
+      const now = Date.now();
+      if (now - lastBack < BACK_COOLDOWN_MS) return; // a double tap would pop two screens
+      lastBack = now;
+      navigation.goBack();
+    },
     dismissAll: () => root.reset({ index: 0, routes: [{ name: 'Tabs' }] }),
   };
 }

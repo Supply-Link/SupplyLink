@@ -3,9 +3,10 @@
 // Dialog, EmptyState, Row, and typography helpers (Title, Body, Muted, SectionLabel).
 
 import { ChevronDown, ChevronLeft, ChevronRight, Check, Cross, Eye, EyeOff, Search, WifiOff, X, type LucideIcon } from 'lucide-react-native';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
+  Easing,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -167,21 +168,88 @@ interface ButtonProps {
   onPress: () => void;
   variant?: Variant;
   icon?: LucideIcon;
+  /** Rotates the icon, e.g. while a refresh is running. */
+  spinning?: boolean;
   disabled?: boolean;
   className?: string;
 }
 
-export function Button({ title, onPress, variant = 'primary', icon: Icon, disabled, className = '' }: ButtonProps) {
+/** Rotates its children continuously while `active`, and settles back to rest when it stops. */
+function Spin({ active, children }: { active: boolean; children: ReactNode }) {
+  const turn = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    turn.setValue(0);
+    if (!active) return;
+    const loop = Animated.loop(
+      Animated.timing(turn, { toValue: 1, duration: 800, easing: Easing.linear, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => {
+      loop.stop();
+      // Native-driven values keep their last angle, so put the icon back at rest explicitly.
+      turn.setValue(0);
+    };
+  }, [active, turn]);
+  const rotate = turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  return <Animated.View style={{ transform: [{ rotate }] }}>{children}</Animated.View>;
+}
+
+/**
+ * Wraps an async action for a spinning icon button: `spinning` stays true while it runs (and for at
+ * least a moment, so a fast refresh still gives feedback); taps while it is running are ignored.
+ */
+export function useSpinningAction(action: () => Promise<unknown>) {
+  const [spinning, setSpinning] = useState(false);
+  const run = async () => {
+    if (spinning) return;
+    setSpinning(true);
+    try {
+      await Promise.all([action(), new Promise<void>((done) => setTimeout(done, 800))]);
+    } finally {
+      setSpinning(false);
+    }
+  };
+  return { spinning, run };
+}
+
+/**
+ * Lets a handler run once per tap burst: further taps are ignored while an async handler is still
+ * running, and for a short cooldown afterwards. Stops slow devices opening a screen or sending a
+ * request several times from repeated taps.
+ */
+export function useSingleTap(handler?: () => unknown, cooldownMs = 600) {
+  const locked = useRef(false);
+  return useCallback(() => {
+    if (locked.current) return;
+    locked.current = true;
+    const release = () => setTimeout(() => (locked.current = false), cooldownMs);
+    try {
+      const result = handler?.();
+      if (result instanceof Promise) result.then(release, release);
+      else release();
+    } catch (error) {
+      release();
+      throw error;
+    }
+  }, [handler, cooldownMs]);
+}
+
+export function Button({ title, onPress, variant = 'primary', icon: Icon, spinning, disabled, className = '' }: ButtonProps) {
   const style = buttonStyles[variant];
+  const press = useSingleTap(onPress);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
-      onPress={onPress}
+      onPress={press}
       className={`mt-2.5 h-12 flex-row items-center justify-center rounded-xl px-4 active:opacity-75 active:scale-[0.98] ${style.box} ${disabled ? 'opacity-50' : ''} ${className}`}
     >
-      {Icon ? <Icon size={18} color={style.icon} /> : null}
+      {Icon ? (
+        <Spin active={spinning === true}>
+          <Icon size={18} color={style.icon} />
+        </Spin>
+      ) : null}
       <Text className={`text-base font-semibold ${Icon ? 'ml-2' : ''} ${style.text}`}>{title}</Text>
     </Pressable>
   );
@@ -330,6 +398,8 @@ interface DialogProps {
 }
 
 export function Dialog({ visible, title, message, confirmLabel, onConfirm, onCancel, children }: DialogProps) {
+  const confirm = useSingleTap(onConfirm);
+  const cancel = useSingleTap(onCancel);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <KeyboardAvoidingView
@@ -341,10 +411,10 @@ export function Dialog({ visible, title, message, confirmLabel, onConfirm, onCan
           {message ? <Muted className="text-sm">{message}</Muted> : null}
           {children}
           <View className="mt-4 flex-row justify-end">
-            <Pressable accessibilityRole="button" onPress={onCancel} className="rounded-xl px-4 py-3">
+            <Pressable accessibilityRole="button" onPress={cancel} className="rounded-xl px-4 py-3">
               <Text className="font-semibold text-muted">Back</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={onConfirm} className="ml-2 rounded-xl bg-brand px-5 py-3">
+            <Pressable accessibilityRole="button" onPress={confirm} className="ml-2 rounded-xl bg-brand px-5 py-3">
               <Text className="font-semibold text-white">{confirmLabel}</Text>
             </Pressable>
           </View>
@@ -468,10 +538,11 @@ export function Chips<T extends string>({ value, options, onChange }: { value: T
 
 /** A tappable settings-style row: icon, label, optional hint and a chevron. */
 export function MenuRow({ icon: Icon, label, hint, onPress, danger }: { icon: LucideIcon; label: string; hint?: string; onPress: () => void; danger?: boolean }) {
+  const press = useSingleTap(onPress);
   return (
     <Pressable
       accessibilityRole="button"
-      onPress={onPress}
+      onPress={press}
       className={`flex-row items-center py-3.5 active:opacity-70 ${danger ? '' : 'border-b border-line'}`}
     >
       <View className={`h-10 w-10 items-center justify-center rounded-xl ${danger ? 'bg-red-50' : 'bg-brand-soft'}`}>

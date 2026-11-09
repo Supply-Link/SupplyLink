@@ -3,12 +3,13 @@
 
 import { useRouter } from '@/navigation/router';
 import { CircleHelp, RefreshCw, Truck } from 'lucide-react-native';
-import { Button, Card, Muted, Screen, SectionLabel, Title } from '@/components/ui';
+import { Button, Card, useSpinningAction, Muted, Screen, SectionLabel, Title } from '@/components/ui';
 import { useSession } from '@/session/SessionProvider';
 
 export default function HelpScreen() {
   const router = useRouter();
   const { refresh } = useSession();
+  const { spinning, run } = useSpinningAction(refresh);
   return (
     <Screen title="Help & support" subtitle="Quick answers for your delivery workspace" onBack={router.back} bottomInset>
       <Card>
@@ -23,7 +24,7 @@ export default function HelpScreen() {
       <Card>
         <Title className="text-base">Connection problems</Title>
         <Muted>Check that your phone is online. If SupplyLink still can't load, wait a moment and try again.</Muted>
-        <Button title="Try refreshing" icon={RefreshCw} variant="secondary" onPress={refresh} />
+        <Button title={spinning ? 'Refreshing…' : 'Try refreshing'} icon={RefreshCw} spinning={spinning} variant="secondary" onPress={run} />
       </Card>
       <SectionLabel>Need a person?</SectionLabel>
       <Card>
