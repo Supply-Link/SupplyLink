@@ -14,16 +14,38 @@ import {
   type ReactNode,
 } from 'react';
 import { Alert, AppState } from 'react-native';
-import { Api, ApiFailure } from '@/lib/api';
-import { DEFAULT_SERVER, LICENCE_POLL_MS, ROLE, SERVER_STORAGE_KEY } from '@/lib/config';
+import { Api, ApiFailure, NetworkError } from '@/lib/api';
+import { DEFAULT_SERVER, LICENCE_POLL_MS, OUTBOX_STORAGE_KEY, ROLE, SERVER_STORAGE_KEY } from '@/lib/config';
 import { licenceRemainingMs, normaliseServer } from '@/lib/rules';
 import type { AuthResponse, Licence, User, Workspace } from '@/lib/types';
 import { useToast } from './ToastProvider';
 
 export type Phase = 'signedOut' | 'locked' | 'ready';
 
+/** A write that could not reach the server; replayed (same idempotency key) once the connection returns. */
+export interface OutboxItem {
+  id: string;
+  userId: string;
+  path: string;
+  body: object;
+  key: string;
+  label: string;
+  orderId?: string;
+}
+
+/** What request() resolves with when a write was saved to the outbox instead of sent. */
+export interface Queued {
+  queued: true;
+}
+
+export function isQueued(value: unknown): value is Queued {
+  return typeof value === 'object' && value !== null && (value as Queued).queued === true;
+}
+
 interface RequestOptions {
   idempotencyKey?: string;
+  /** If the network is down, keep this POST and send it later instead of failing. */
+  queue?: { label: string; orderId?: string };
   /** Background requests never show errors or the activity label. */
   silent?: boolean;
 }
@@ -40,6 +62,12 @@ interface Session {
   workspace: Workspace | null;
   busy: boolean;
   activity: string;
+  /** True after a request failed to reach the server; clears on the next success. */
+  offline: boolean;
+  /** When the workspace was last loaded from the server (ms), or 0. */
+  lastSynced: number;
+  /** Saved writes waiting for a connection, for the signed-in user. */
+  pending: OutboxItem[];
   request<T>(method: 'GET' | 'POST', path: string, body?: object, options?: RequestOptions): Promise<T | undefined>;
   setServer(input: string): Promise<boolean>;
   signIn(server: string, email: string, password: string): Promise<void>;
@@ -55,7 +83,7 @@ const SessionContext = createContext<Session | null>(null);
 const MAX_TIMER_MS = 2 ** 31 - 1;
 
 function showError(message: string) {
-  Alert.alert('Unable to complete', message);
+  Alert.alert('Something went wrong', message);
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -71,8 +99,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [activity, setActivity] = useState('');
   const [epoch, setEpoch] = useState(0);
+  const [offline, setOffline] = useState(false);
+  const [lastSynced, setLastSynced] = useState(0);
+  const [outbox, setOutbox] = useState<OutboxItem[]>([]);
+  const outboxLoaded = useRef(false);
+  const flushing = useRef(false);
+  const wasOffline = useRef(false);
 
   const signedInRef = useRef(false);
+  const userIdRef = useRef<string | null>(null);
   const busyRef = useRef(false);
   const licenceUsableRef = useRef(false);
   const deadlineRef = useRef(0);
@@ -88,7 +123,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
       })
       .finally(() => setHydrated(true));
+    AsyncStorage.getItem(OUTBOX_STORAGE_KEY)
+      .then((saved) => {
+        if (saved) setOutbox(JSON.parse(saved) as OutboxItem[]);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        outboxLoaded.current = true;
+      });
   }, []);
+
+  useEffect(() => {
+    if (!outboxLoaded.current) return;
+    AsyncStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(outbox)).catch(() => undefined);
+  }, [outbox]);
 
   /** Drops every piece of business data held in memory. */
   const purge = useCallback(() => {
@@ -148,8 +196,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setBusy(true);
       if (!options.silent) setActivity('Connecting to your server…');
       try {
-        return await apiRef.current.call<T>(method, path, body, options.idempotencyKey);
+        const result = await apiRef.current.call<T>(method, path, body, options.idempotencyKey);
+        setOffline(false);
+        return result;
       } catch (error) {
+        if (error instanceof NetworkError) {
+          setOffline(true);
+          const uid = userIdRef.current;
+          if (options.queue && method === 'POST' && body && options.idempotencyKey && uid) {
+            const item: OutboxItem = {
+              id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+              userId: uid,
+              path,
+              body,
+              key: options.idempotencyKey,
+              label: options.queue.label,
+              orderId: options.queue.orderId,
+            };
+            setOutbox((list) => [...list, item]);
+            return { queued: true } as unknown as T;
+          }
+        } else setOffline(false);
         if (error instanceof ApiFailure && error.status === 423) {
           applyLicence((error.payload.license as Licence | undefined) ?? {});
           if (!signedInRef.current) showError(error.message);
@@ -157,7 +224,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
         if (error instanceof ApiFailure && error.status === 401 && signedInRef.current) endSession();
         if (!options.silent) {
-          showError(error instanceof Error && error.message ? error.message : 'Connection failed. Check the server URL and network.');
+          showError(error instanceof Error && error.message ? error.message : "Can't reach SupplyLink right now. Check your internet connection and try again.");
         }
         return undefined;
       } finally {
@@ -174,6 +241,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (result) {
       setWorkspace(result);
       setUser(result.user);
+      setLastSynced(Date.now());
     }
   }, [request]);
 
@@ -237,6 +305,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (result) adoptLicence(result);
   }, [adoptLicence, request]);
 
+  userIdRef.current = user?.id ?? null;
+
   const phase: Phase = !signedIn ? 'signedOut' : licenceOk ? 'ready' : 'locked';
 
   useEffect(() => {
@@ -265,6 +335,45 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => () => clearTimeout(expiryTimer.current), []);
 
+  const pending = useMemo(() => outbox.filter((item) => item.userId === user?.id), [outbox, user?.id]);
+
+  // Replays saved writes oldest-first once the connection is back, then reloads the workspace.
+  useEffect(() => {
+    const reconnected = wasOffline.current && !offline;
+    wasOffline.current = offline;
+    if (!signedIn || !licenceOk || offline || flushing.current) return;
+    if (pending.length === 0) {
+      if (reconnected) void refresh();
+      return;
+    }
+    flushing.current = true;
+    (async () => {
+      let synced = false;
+      for (const item of pending) {
+        try {
+          await apiRef.current.call('POST', item.path, item.body, item.key);
+          synced = true;
+        } catch (error) {
+          if (error instanceof NetworkError) {
+            setOffline(true);
+            break;
+          }
+          if (error instanceof ApiFailure && (error.status === 401 || error.status === 423)) break;
+          showError(`Couldn't sync "${item.label}": ${error instanceof Error ? error.message : 'it was rejected.'}`);
+        }
+        setOutbox((list) => list.filter((entry) => entry.id !== item.id));
+      }
+      flushing.current = false;
+      if (synced) void request<Workspace>('GET', '/api/state', undefined, { silent: true }).then((result) => {
+        if (result) {
+          setWorkspace(result);
+          setUser(result.user);
+          setLastSynced(Date.now());
+        }
+      });
+    })();
+  }, [licenceOk, offline, pending, refresh, request, signedIn]);
+
   const keyFor = useCallback((scope: string) => {
     let key = keys.current.get(scope);
     if (!key) {
@@ -290,6 +399,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       workspace,
       busy,
       activity,
+      offline,
+      lastSynced,
+      pending,
       request,
       setServer,
       signIn,
@@ -300,7 +412,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       dropKey,
       showError,
     }),
-    [activity, busy, checkLicence, dropKey, epoch, hydrated, keyFor, licence, licenceOk, phase, refresh, request, serverUrl, signIn, signOut, setServer, user, workspace],
+    [activity, busy, offline, lastSynced, pending, checkLicence, dropKey, epoch, hydrated, keyFor, licence, licenceOk, phase, refresh, request, serverUrl, signIn, signOut, setServer, user, workspace],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

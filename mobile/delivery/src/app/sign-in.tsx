@@ -3,7 +3,6 @@
 import { useRouter } from '@/navigation/router';
 import { LogIn, UserPlus } from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 import { Button, Card, Field, Muted, Screen, Title } from '@/components/ui';
 import { APP, DEFAULT_SERVER } from '@/lib/config';
 import { useSession } from '@/session/SessionProvider';
@@ -13,11 +12,15 @@ export default function SignInScreen() {
   const { signIn, setServer, busy } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
   const submit = () => {
-    if (!email.trim()) return Alert.alert('Required', 'Enter your email address.');
-    if (!password) return Alert.alert('Required', 'Enter your password.');
-    signIn(DEFAULT_SERVER, email.trim(), password);
+    const next: typeof errors = {};
+    if (!email.trim()) next.email = 'Enter your email address.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) next.email = 'Enter a valid email, like name@company.com.';
+    if (!password) next.password = 'Enter your password.';
+    setErrors(next);
+    if (Object.keys(next).length === 0) void signIn(DEFAULT_SERVER, email.trim(), password);
   };
 
   return (
@@ -28,7 +31,12 @@ export default function SignInScreen() {
         <Field
           label="Email"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(v) => {
+            setEmail(v);
+            setErrors((e) => ({ ...e, email: undefined }));
+          }}
+          error={errors.email}
+          placeholder="name@company.com"
           autoCapitalize="none"
           autoComplete="email"
           keyboardType="email-address"
@@ -37,7 +45,12 @@ export default function SignInScreen() {
         <Field
           label="Password"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(v) => {
+            setPassword(v);
+            setErrors((e) => ({ ...e, password: undefined }));
+          }}
+          error={errors.password}
+          placeholder="Your password"
           secureTextEntry
           autoComplete="password"
           textContentType="password"

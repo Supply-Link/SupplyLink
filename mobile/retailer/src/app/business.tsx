@@ -35,8 +35,8 @@ export default function BusinessScreen() {
         <Field label="Legal business name" value={form.legal_name} onChangeText={set('legal_name')} />
         <Field label="Business address" value={form.address} onChangeText={set('address')} multiline />
         <Select label="GST state" value={form.state_code} options={STATE_OPTIONS} onChange={set('state_code')} />
-        <Field label="GSTIN" value={form.gstin} onChangeText={set('gstin')} autoCapitalize="characters" />
-        <Field label="Drug licence" value={form.drug_license} onChangeText={set('drug_license')} />
+        <Field label="GSTIN" value={form.gstin} onChangeText={set('gstin')} placeholder="15-character GSTIN (optional)" autoCapitalize="characters" maxLength={15} />
+        <Field label="Drug licence" value={form.drug_license} onChangeText={set('drug_license')} placeholder="Licence number (optional)" />
         <Button title="Save details" icon={Save} disabled={busy} onPress={save} />
       </Card>
       <Muted className="mt-3 text-xs">

@@ -14,8 +14,10 @@ export default function AlertsScreen() {
   };
 
   return (
-    <Screen title="Alerts" subtitle={user?.business ?? user?.name} onRefresh={refresh}>
-      <Button title="Mark all read" icon={CheckCheck} variant="secondary" onPress={markAllRead} />
+    <Screen title="Alerts" subtitle={user?.business ?? user?.name} onRefresh={refresh} loading={!workspace}>
+      {workspace?.notifications.some((n) => !n.read) ? (
+        <Button title="Mark all read" icon={CheckCheck} variant="secondary" onPress={markAllRead} />
+      ) : null}
       <NotificationList notifications={workspace?.notifications ?? []} emptyIcon={Bell} />
     </Screen>
   );

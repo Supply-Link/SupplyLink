@@ -41,7 +41,8 @@ export default function OrderScreen() {
   return (
     <Screen title={order.number} subtitle={stageLabel(order.status)} onBack={router.back} onRefresh={refresh} bottomInset>
       <Card>
-        <Title>{order.retailer_name}</Title>
+        <Title>{order.supplier?.business ?? order.retailer_name}</Title>
+        {order.supplier?.business ? <Muted>Supplied by this distributor</Muted> : null}
         <StageBadge status={order.status} />
         <Body>{order.address}</Body>
         <Muted className="text-sm">
@@ -75,7 +76,7 @@ export default function OrderScreen() {
               </View>
             ))
           ) : (
-            <Muted className="text-xs">Batch details are unavailable for this legacy order.</Muted>
+            <Muted className="text-xs">No batch details were recorded for this item.</Muted>
           )}
         </Card>
       ))}

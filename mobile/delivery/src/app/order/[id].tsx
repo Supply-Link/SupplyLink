@@ -2,16 +2,16 @@
 // GPS/manual location share, signature capture navigation, and cash collection.
 
 import { useLocalSearchParams, useRouter } from '@/navigation/router';
-import { Banknote, MapPin, Navigation, Package, PackageCheck, PencilLine, RefreshCw } from 'lucide-react-native';
+import { Banknote, MapPin, Navigation, Package, PackageCheck, PencilLine, RefreshCw, Route } from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, Linking, Text, View } from 'react-native';
 import { StageBadge, Timeline, Totals } from '@/components/orders';
 import { Body, Button, Card, colors, Dialog, EmptyState, Field, Muted, Screen, Title } from '@/components/ui';
 import { currentFix } from '@/lib/location';
 import { coordinate, dateTime, money, percent, stageLabel } from '@/lib/rules';
 import { stateName } from '@/lib/states';
 import type { Order } from '@/lib/types';
-import { useSession } from '@/session/SessionProvider';
+import { isQueued, useSession } from '@/session/SessionProvider';
 import { useToast } from '@/session/ToastProvider';
 
 export default function OrderScreen() {
@@ -36,9 +36,24 @@ export default function OrderScreen() {
         <Title>{order.retailer_name}</Title>
         <StageBadge status={order.status} />
         <Body>{order.address}</Body>
-        <Muted className="text-sm">
-          Payment: {order.payment_method === 'cod' ? 'Cash on delivery' : 'Trade credit'} · {order.payment_status}
-        </Muted>
+        {order.status === 'out_for_delivery' && order.address ? (
+          <Button
+            title="Navigate to address"
+            icon={Route}
+            variant="secondary"
+            onPress={() => void Linking.openURL(`geo:0,0?q=${encodeURIComponent(order.address)}`)}
+          />
+        ) : null}
+        {order.payment_method === 'cod' && order.payment_status !== 'paid' && order.status !== 'cancelled' ? (
+          <View className="mt-3 flex-row items-center rounded-xl bg-brand-accent/60 px-3 py-2.5">
+            <Banknote size={18} color={colors.brand} />
+            <Text className="ml-2 flex-1 text-[15px] font-bold text-brand">Collect {money(order.total)} in cash</Text>
+          </View>
+        ) : (
+          <Muted className="text-sm">
+            Payment: {order.payment_method === 'cod' ? 'Cash on delivery' : 'Trade credit'} · {order.payment_status}
+          </Muted>
+        )}
         <Muted>
           Place of supply: {stateName(order.supply_state_code)}
           {order.tax_type ? ` · ${order.tax_type}` : ''}
@@ -69,7 +84,7 @@ export default function OrderScreen() {
               </View>
             ))
           ) : (
-            <Muted className="text-xs">Batch details are unavailable for this legacy order.</Muted>
+            <Muted className="text-xs">No batch details were recorded for this item.</Muted>
           )}
         </Card>
       ))}
@@ -112,7 +127,7 @@ export default function OrderScreen() {
 function DeliveryActions({ order }: { order: Order }) {
   const router = useRouter();
   const toast = useToast();
-  const { request, refresh, keyFor, dropKey, showError, busy } = useSession();
+  const { request, refresh, keyFor, dropKey, showError, busy, pending } = useSession();
   const [manualOpen, setManualOpen] = useState(false);
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
@@ -129,7 +144,17 @@ function DeliveryActions({ order }: { order: Order }) {
         {
           text: 'Share',
           onPress: async () => {
-            if (!(await request('POST', '/api/tracking', { order_id: order.id, latitude: lat, longitude: lon }))) return;
+            const sent = await request(
+              'POST',
+              '/api/tracking',
+              { order_id: order.id, latitude: lat, longitude: lon },
+              { idempotencyKey: keyFor(`track:${order.id}:${lat},${lon}`), queue: { label: `Location · ${order.number}`, orderId: order.id } },
+            );
+            if (!sent) return;
+            if (isQueued(sent)) {
+              toast("Saved. It will be sent when you're back online.");
+              return;
+            }
             toast('Location shared.');
             await refresh();
           },
@@ -168,11 +193,15 @@ function DeliveryActions({ order }: { order: Order }) {
       'POST',
       '/api/payments',
       { order_id: order.id, amount: order.total, reference: ref },
-      { idempotencyKey: keyFor(scope) },
+      { idempotencyKey: keyFor(scope), queue: { label: `Collection · ${order.number}`, orderId: order.id } },
     );
     if (!payment) return;
-    dropKey(scope);
     setReference('');
+    if (isQueued(payment)) {
+      toast("Saved. It will be recorded when you're back online.");
+      return;
+    }
+    dropKey(scope);
     toast('Collection recorded.');
     await refresh();
   };
@@ -180,6 +209,18 @@ function DeliveryActions({ order }: { order: Order }) {
   const outForDelivery = order.status === 'out_for_delivery';
   const awaitingCollection = order.status === 'delivered' && order.payment_status !== 'paid';
   if (!outForDelivery && !awaitingCollection) return null;
+
+  const waiting = pending.filter((item) => item.orderId === order.id && item.path !== '/api/tracking');
+  if (waiting.length > 0)
+    return (
+      <Card>
+        <Title className="text-base">Waiting to sync</Title>
+        <Muted>
+          {waiting.map((item) => item.label).join(', ')} {waiting.length === 1 ? 'is' : 'are'} saved on this phone and will be sent
+          automatically when you're back online.
+        </Muted>
+      </Card>
+    );
 
   return (
     <>
